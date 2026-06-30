@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { demoPolicies, hasDatabaseUrl } from "@/lib/demo-data";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -7,7 +7,7 @@ import { SiteFooter } from "@/components/site-footer";
 export default async function PolicyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const policy = hasDatabaseUrl
-    ? await prisma.policyPage.findUnique({ where: { slug } })
+    ? await db.policyPage.findUnique({ where: { slug } })
     : demoPolicies[slug as keyof typeof demoPolicies];
   if (!policy) notFound();
   return (

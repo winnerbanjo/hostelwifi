@@ -8,7 +8,7 @@ export const orderSchema = z.object({
   email: z.string().email(),
   roomNumber: z.string().min(1),
   blockFloor: z.string().optional().default(""),
-  paymentMethod: z.enum(["paystack", "bank_transfer"])
+  paymentMethod: z.literal("bank_transfer")
 });
 
 export const bankTransferSchema = z.object({

@@ -1,5 +1,4 @@
-import { Prisma, Voucher } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 
 export type VoucherInput = {
   orderId: string;
@@ -12,9 +11,9 @@ export type VoucherInput = {
 };
 
 export interface NetworkProvider {
-  generateVoucher(input: VoucherInput, tx?: Prisma.TransactionClient): Promise<Voucher>;
-  revokeVoucher(voucherCode: string): Promise<Voucher>;
-  checkVoucherStatus(voucherCode: string): Promise<Voucher | null>;
+  generateVoucher(input: VoucherInput, tx?: typeof db): Promise<any>;
+  revokeVoucher(voucherCode: string): Promise<any>;
+  checkVoucherStatus(voucherCode: string): Promise<any | null>;
 }
 
 function segment() {
@@ -23,7 +22,7 @@ function segment() {
 }
 
 export class InternalVoucherProvider implements NetworkProvider {
-  async generateVoucher(input: VoucherInput, tx: Prisma.TransactionClient = prisma) {
+  async generateVoucher(input: VoucherInput, tx: typeof db = db) {
     const existing = await tx.voucher.findUnique({ where: { orderId: input.orderId } });
     if (existing) return existing;
 
@@ -51,14 +50,14 @@ export class InternalVoucherProvider implements NetworkProvider {
   }
 
   revokeVoucher(voucherCode: string) {
-    return prisma.voucher.update({
+    return db.voucher.update({
       where: { code: voucherCode },
       data: { status: "revoked", revokedAt: new Date() }
     });
   }
 
   checkVoucherStatus(voucherCode: string) {
-    return prisma.voucher.findUnique({
+    return db.voucher.findUnique({
       where: { code: voucherCode },
       include: { hostel: true, plan: true, order: true }
     });
@@ -68,13 +67,13 @@ export class InternalVoucherProvider implements NetworkProvider {
 export const networkProvider: NetworkProvider = new InternalVoucherProvider();
 
 export class MikroTikVoucherProvider implements NetworkProvider {
-  generateVoucher(): Promise<Voucher> {
+  generateVoucher(): Promise<any> {
     throw new Error("MikroTik integration is not configured yet.");
   }
-  revokeVoucher(): Promise<Voucher> {
+  revokeVoucher(): Promise<any> {
     throw new Error("MikroTik integration is not configured yet.");
   }
-  checkVoucherStatus(): Promise<Voucher | null> {
+  checkVoucherStatus(): Promise<any | null> {
     throw new Error("MikroTik integration is not configured yet.");
   }
 }

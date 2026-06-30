@@ -39,14 +39,14 @@ export const demoPolicies = {
   }
 };
 
-export const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
+export const hasDatabaseUrl = Boolean(process.env.MONGODB_URI);
 
 export function demoVoucherCode(reference: string) {
   const clean = reference.replace(/[^A-Z0-9]/gi, "").toUpperCase().padEnd(8, "X");
   return `JTP-${clean.slice(-8, -4)}-${clean.slice(-4)}`;
 }
 
-export function demoOrder(reference: string, paymentMethod: "paystack" | "bank_transfer" = "paystack", planId?: string, hostelId?: string) {
+export function demoOrder(reference: string, paymentMethod: "bank_transfer" = "bank_transfer", planId?: string, hostelId?: string) {
   const plan = demoPlans.find((item) => item.id === planId) || demoPlans[0];
   const hostel = demoHostels.find((item) => item.id === hostelId) || demoHostels[0];
   return {
@@ -63,17 +63,6 @@ export function demoOrder(reference: string, paymentMethod: "paystack" | "bank_t
     orderStatus: paymentMethod === "bank_transfer" ? "pending" : "completed",
     hostel,
     plan,
-    voucher: paymentMethod === "bank_transfer" ? null : {
-      id: `voucher-${reference}`,
-      code: demoVoucherCode(reference),
-      status: "delivered",
-      validityDays: plan.validityDays,
-      deviceLimit: plan.deviceLimit,
-      dataSizeGb: plan.dataSizeGb,
-      generatedAt: new Date(),
-      expiresAt: new Date(Date.now() + plan.validityDays * 24 * 60 * 60 * 1000),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
+    voucher: null
   };
 }

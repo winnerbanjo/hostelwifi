@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { business, money } from "@/lib/constants";
+import { money } from "@/lib/constants";
 
 type Props = {
   hostels: { id: string; name: string }[];
@@ -15,7 +15,6 @@ export function CheckoutForm({ hostels, plans, initialHostelId, initialPlanId }:
   const router = useRouter();
   const [hostelId, setHostelId] = useState(initialHostelId || hostels[0]?.id || "");
   const [planId, setPlanId] = useState(initialPlanId || plans[0]?.id || "");
-  const [paymentMethod, setPaymentMethod] = useState<"paystack" | "bank_transfer">("paystack");
   const [loading, setLoading] = useState(false);
   const selectedPlan = plans.find((plan) => plan.id === planId);
 
@@ -29,7 +28,7 @@ export function CheckoutForm({ hostels, plans, initialHostelId, initialPlanId }:
       email: String(formData.get("email") || ""),
       roomNumber: String(formData.get("roomNumber") || ""),
       blockFloor: String(formData.get("blockFloor") || ""),
-      paymentMethod
+      paymentMethod: "bank_transfer"
     };
     const orderRes = await fetch("/api/orders/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const orderJson = await orderRes.json();
@@ -38,18 +37,7 @@ export function CheckoutForm({ hostels, plans, initialHostelId, initialPlanId }:
       setLoading(false);
       return;
     }
-    if (paymentMethod === "bank_transfer") {
-      router.push(`/payment/bank-transfer?reference=${orderJson.order.reference}&planId=${planId}&hostelId=${hostelId}`);
-      return;
-    }
-    const payRes = await fetch("/api/payments/paystack/initialize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reference: orderJson.order.reference, planId, hostelId }) });
-    const payJson = await payRes.json();
-    if (!payRes.ok) {
-      alert(payJson.error || "Unable to start payment.");
-      setLoading(false);
-      return;
-    }
-    window.location.href = payJson.data.authorization_url;
+    router.push(`/payment/bank-transfer?reference=${orderJson.order.reference}&planId=${planId}&hostelId=${hostelId}`);
   }
 
   return (
@@ -64,10 +52,7 @@ export function CheckoutForm({ hostels, plans, initialHostelId, initialPlanId }:
           <label className="grid gap-2 text-sm font-semibold">Room number<input required name="roomNumber" className="field" /></label>
           <label className="grid gap-2 text-sm font-semibold md:col-span-2">Block/floor<input name="blockFloor" className="field" placeholder="Optional" /></label>
         </div>
-        <div className="mt-5 grid gap-3 md:grid-cols-2">
-          <button type="button" onClick={() => setPaymentMethod("paystack")} className={`rounded-lg border p-4 text-left font-bold ${paymentMethod === "paystack" ? "border-brand bg-emerald-50" : "border-line"}`}>Paystack<p className="mt-1 text-sm font-normal text-slate-500">Card, bank, transfer, USSD</p></button>
-          <button type="button" onClick={() => setPaymentMethod("bank_transfer")} className={`rounded-lg border p-4 text-left font-bold ${paymentMethod === "bank_transfer" ? "border-brand bg-emerald-50" : "border-line"}`}>Bank transfer<p className="mt-1 text-sm font-normal text-slate-500">Manual confirmation</p></button>
-        </div>
+        <div className="mt-5 rounded-lg border border-brand bg-emerald-50 p-4 text-sm font-semibold text-brand">Payment is by bank transfer. Your voucher will be released after admin confirmation.</div>
         <label className="mt-5 flex items-start gap-3 text-sm text-slate-600"><input required type="checkbox" className="mt-1" /> I agree to the terms, refund policy, and internet usage rules.</label>
       </div>
       <aside className="card h-fit p-5">
@@ -77,9 +62,9 @@ export function CheckoutForm({ hostels, plans, initialHostelId, initialPlanId }:
         <div className="mt-4 grid gap-2 text-sm text-slate-600">
           <p>Validity: {selectedPlan?.validityDays} day(s)</p>
           <p>Devices: {selectedPlan?.deviceLimit}</p>
-          {paymentMethod === "bank_transfer" ? <p>Bank: {business.bank.bankName}, {business.bank.accountNumber}</p> : null}
+          <p>Payment: Bank transfer</p>
         </div>
-        <button disabled={loading} className="btn btn-primary mt-6 w-full">{loading ? "Processing..." : paymentMethod === "paystack" ? "Continue to Paystack" : "Continue to Bank Transfer"}</button>
+        <button disabled={loading} className="btn btn-primary mt-6 w-full">{loading ? "Processing..." : "Continue to Bank Transfer"}</button>
       </aside>
     </form>
   );

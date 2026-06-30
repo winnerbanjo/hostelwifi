@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, CreditCard, Headphones, ShieldCheck, Wifi } from "lucide-react";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { demoHostels, demoPlans, hasDatabaseUrl } from "@/lib/demo-data";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -10,8 +10,8 @@ import { business, whatsappLink } from "@/lib/constants";
 export default async function Home() {
   const [hostels, plans] = hasDatabaseUrl
     ? await Promise.all([
-        prisma.hostel.findMany({ where: { status: "active" }, orderBy: { name: "asc" } }),
-        prisma.plan.findMany({ where: { status: "active" }, orderBy: { price: "asc" }, take: 3 })
+        db.hostel.findMany({ where: { status: "active" }, orderBy: { name: "asc" } }),
+        db.plan.findMany({ where: { status: "active" }, orderBy: { price: "asc" }, take: 3 })
       ])
     : [demoHostels, demoPlans.slice(0, 3)];
 
@@ -84,7 +84,7 @@ export default async function Home() {
 
         <section className="py-14">
           <div className="container grid gap-4 md:grid-cols-3">
-            <div className="flex gap-3 rounded-lg border border-line p-5"><ShieldCheck className="text-brand" /><div><p className="font-bold">Secure payments</p><p className="text-sm text-slate-600">Paystack verification happens on the backend.</p></div></div>
+            <div className="flex gap-3 rounded-lg border border-line p-5"><ShieldCheck className="text-brand" /><div><p className="font-bold">Bank transfer payments</p><p className="text-sm text-slate-600">Admin confirms transfers before vouchers are released.</p></div></div>
             <div className="flex gap-3 rounded-lg border border-line p-5"><CreditCard className="text-brand" /><div><p className="font-bold">Bank transfer supported</p><p className="text-sm text-slate-600">Upload proof or reference, then admin releases voucher.</p></div></div>
             <div className="flex gap-3 rounded-lg border border-line p-5"><Headphones className="text-brand" /><div><p className="font-bold">WhatsApp-first support</p><p className="text-sm text-slate-600">{business.whatsapp}</p></div></div>
           </div>

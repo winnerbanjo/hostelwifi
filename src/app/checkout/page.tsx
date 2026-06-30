@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { demoHostels, demoPlans, hasDatabaseUrl } from "@/lib/demo-data";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -8,8 +8,8 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   const params = await searchParams;
   const [hostels, plans] = hasDatabaseUrl
     ? await Promise.all([
-        prisma.hostel.findMany({ where: { status: "active" }, orderBy: { name: "asc" } }),
-        prisma.plan.findMany({ where: { status: "active" }, orderBy: { price: "asc" } })
+        db.hostel.findMany({ where: { status: "active" }, orderBy: { name: "asc" } }),
+        db.plan.findMany({ where: { status: "active" }, orderBy: { price: "asc" } })
       ])
     : [demoHostels, demoPlans];
   return (

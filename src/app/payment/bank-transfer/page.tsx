@@ -1,15 +1,17 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { demoOrder, hasDatabaseUrl } from "@/lib/demo-data";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { business, money, whatsappLink } from "@/lib/constants";
+import { money, whatsappLink } from "@/lib/constants";
+import { getBankDetails } from "@/lib/business-settings";
 import { BankTransferForm } from "./transfer-form";
 
 export default async function BankTransferPage({ searchParams }: { searchParams: Promise<{ reference?: string; planId?: string; hostelId?: string }> }) {
   const { reference, planId, hostelId } = await searchParams;
+  const bank = await getBankDetails();
   const order = reference
     ? hasDatabaseUrl
-      ? await prisma.order.findUnique({ where: { reference }, include: { plan: true, hostel: true } })
+      ? await db.order.findUnique({ where: { reference }, include: { plan: true, hostel: true } })
       : demoOrder(reference, "bank_transfer", planId, hostelId)
     : null;
   return (
@@ -25,9 +27,9 @@ export default async function BankTransferPage({ searchParams }: { searchParams:
                 <div className="mt-6 grid gap-3 rounded-lg border border-line bg-white p-4 text-sm">
                   <p><b>Amount:</b> {money(order.amount)}</p>
                   <p><b>Order reference:</b> {order.reference}</p>
-                  <p><b>Account number:</b> {business.bank.accountNumber}</p>
-                  <p><b>Bank:</b> {business.bank.bankName}</p>
-                  <p><b>Account name:</b> {business.bank.accountName}</p>
+                  <p><b>Account number:</b> {bank.accountNumber}</p>
+                  <p><b>Bank:</b> {bank.bankName}</p>
+                  <p><b>Account name:</b> {bank.accountName}</p>
                 </div>
                 <BankTransferForm reference={order.reference} />
               </>

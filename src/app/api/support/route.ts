@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { supportSchema } from "@/lib/validators";
 
 export async function POST(request: Request) {
@@ -7,12 +7,12 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const data = parsed.data;
   const order = data.codeOrReference
-    ? await prisma.order.findFirst({ where: { reference: data.codeOrReference } })
+    ? await db.order.findFirst({ where: { reference: data.codeOrReference } })
     : null;
   const voucher = data.codeOrReference
-    ? await prisma.voucher.findFirst({ where: { code: data.codeOrReference.toUpperCase() } })
+    ? await db.voucher.findFirst({ where: { code: data.codeOrReference.toUpperCase() } })
     : null;
-  const ticket = await prisma.supportTicket.create({
+  const ticket = await db.supportTicket.create({
     data: {
       fullName: data.fullName,
       phone: data.phone,

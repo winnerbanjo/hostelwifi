@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { demoHostels, hasDatabaseUrl } from "@/lib/demo-data";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -6,7 +6,7 @@ import { SupportForm } from "./support-form";
 
 export default async function SupportPage() {
   const hostels = hasDatabaseUrl
-    ? await prisma.hostel.findMany({ where: { status: "active" }, orderBy: { name: "asc" } })
+    ? await db.hostel.findMany({ where: { status: "active" }, orderBy: { name: "asc" } })
     : demoHostels;
   return (
     <>

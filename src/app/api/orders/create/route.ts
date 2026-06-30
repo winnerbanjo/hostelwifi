@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { demoPlans, hasDatabaseUrl } from "@/lib/demo-data";
 import { createOrderReference } from "@/lib/orders";
 import { orderSchema } from "@/lib/validators";
@@ -29,20 +29,20 @@ export async function POST(request: Request) {
     });
   }
 
-  const plan = await prisma.plan.findUnique({ where: { id: data.planId } });
-  const hostelPlan = await prisma.hostelPlan.findFirst({
+  const plan = await db.plan.findUnique({ where: { id: data.planId } });
+  const hostelPlan = await db.hostelPlan.findFirst({
     where: { hostelId: data.hostelId, planId: data.planId, status: "active", hostel: { status: "active" }, plan: { status: "active" } }
   });
   if (!plan || !hostelPlan) return NextResponse.json({ error: "Plan is not available for this hostel" }, { status: 400 });
 
-  const customer = await prisma.customer.upsert({
+  const customer = await db.customer.upsert({
     where: { email_phone: { email: data.email, phone: data.phone } },
     update: { fullName: data.fullName },
     create: { fullName: data.fullName, phone: data.phone, email: data.email }
   });
 
   const reference = createOrderReference();
-  const order = await prisma.order.create({
+  const order = await db.order.create({
     data: {
       reference,
       customerId: customer.id,

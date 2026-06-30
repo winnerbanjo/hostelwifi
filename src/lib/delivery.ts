@@ -1,11 +1,10 @@
-import { Order, Plan, Voucher, Hostel } from "@prisma/client";
 import { business } from "@/lib/constants";
 
 export type VoucherDeliveryPayload = {
-  order: Order;
-  voucher: Voucher;
-  plan: Plan;
-  hostel: Hostel;
+  order: any;
+  voucher: any;
+  plan: any;
+  hostel: any;
 };
 
 export interface DeliveryProvider {

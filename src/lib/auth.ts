@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "crypto";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { demoAdmin } from "@/lib/admin-demo";
 import { hasDatabaseUrl } from "@/lib/demo-data";
 
@@ -47,7 +47,7 @@ export async function getAdmin() {
   const payload = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as { adminId: string; exp: number };
   if (payload.exp < Date.now()) return null;
   if (!hasDatabaseUrl && payload.adminId === demoAdmin.id) return demoAdmin;
-  return prisma.adminUser.findFirst({ where: { id: payload.adminId, status: "active" } });
+  return db.adminUser.findFirst({ where: { id: payload.adminId, status: "active" } });
 }
 
 export async function requireAdmin() {

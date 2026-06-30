@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { demoAdminData } from "@/lib/admin-demo";
 import { hasDatabaseUrl } from "@/lib/demo-data";
@@ -14,6 +14,6 @@ export async function GET(request: Request) {
     orderStatus: "completed" as const,
     ...(from || to ? { paidAt: { gte: from ? new Date(from) : undefined, lte: to ? new Date(to) : undefined } } : {})
   };
-  const orders = await prisma.order.findMany({ where, include: { hostel: true, plan: true }, orderBy: { paidAt: "desc" } });
+  const orders = await db.order.findMany({ where, include: { hostel: true, plan: true }, orderBy: { paidAt: "desc" } });
   return NextResponse.json({ orders });
 }

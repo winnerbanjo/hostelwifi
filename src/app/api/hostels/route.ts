@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 
 export async function GET() {
-  const hostels = await prisma.hostel.findMany({ where: { status: "active" }, orderBy: { name: "asc" } });
+  const hostels = await db.hostel.findMany({ where: { status: "active" }, orderBy: { name: "asc" } });
   return NextResponse.json({ hostels });
 }

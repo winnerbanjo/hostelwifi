@@ -1,9 +1,9 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { deliverVoucher } from "@/lib/delivery";
 import { networkProvider } from "@/lib/network-provider";
 
 export async function completePaidOrder(reference: string, provider: string, rawResponse: unknown) {
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { reference },
       include: { plan: true, hostel: true, voucher: true }
@@ -47,13 +47,13 @@ export async function completePaidOrder(reference: string, provider: string, raw
 
     return { ...order, voucher };
   }).then(async (order) => {
-    const fresh = await prisma.order.findUnique({
+    const fresh = await db.order.findUnique({
       where: { id: order.id },
       include: { voucher: true, plan: true, hostel: true }
     });
     if (fresh?.voucher) {
       const delivery = await deliverVoucher({ order: fresh, voucher: fresh.voucher, plan: fresh.plan, hostel: fresh.hostel });
-      await prisma.voucher.update({
+      await db.voucher.update({
         where: { id: fresh.voucher.id },
         data: { status: "delivered", deliveryStatus: JSON.stringify(delivery) }
       });

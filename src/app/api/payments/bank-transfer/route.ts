@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { hasDatabaseUrl } from "@/lib/demo-data";
 import { bankTransferSchema } from "@/lib/validators";
 
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       demo: true
     });
   }
-  const order = await prisma.order.update({
+  const order = await db.order.update({
     where: { reference: data.reference },
     data: {
       bankTransferReference: data.bankTransferReference,

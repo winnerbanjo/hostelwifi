@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { demoHostels, demoPlans, hasDatabaseUrl } from "@/lib/demo-data";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -7,11 +7,11 @@ import { PlanCard } from "@/components/plan-card";
 export default async function PlansPage({ searchParams }: { searchParams: Promise<{ hostelId?: string }> }) {
   const { hostelId } = await searchParams;
   const hostels = hasDatabaseUrl
-    ? await prisma.hostel.findMany({ where: { status: "active" }, orderBy: { name: "asc" } })
+    ? await db.hostel.findMany({ where: { status: "active" }, orderBy: { name: "asc" } })
     : demoHostels;
   const selectedHostel = hostelId || hostels[0]?.id;
   const rows = hasDatabaseUrl && selectedHostel
-    ? await prisma.hostelPlan.findMany({ where: { hostelId: selectedHostel, status: "active", plan: { status: "active" } }, include: { plan: true }, orderBy: { plan: { price: "asc" } } })
+    ? await db.hostelPlan.findMany({ where: { hostelId: selectedHostel, status: "active", plan: { status: "active" } }, include: { plan: true }, orderBy: { plan: { price: "asc" } } })
     : demoPlans.map((plan) => ({ plan }));
 
   return (

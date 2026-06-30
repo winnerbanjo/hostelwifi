@@ -4,11 +4,26 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, LogOut, RefreshCw } from "lucide-react";
 import { money, whatsappLink } from "@/lib/constants";
 
-const tabs = ["Overview", "Orders", "Vouchers", "Hostels", "Plans", "Support", "Reports", "Policies", "Customers"];
+const tabs = ["Overview", "Orders", "Vouchers", "Hostels", "Plans", "Settings", "Support", "Reports", "Policies", "Customers"];
 
 async function getJson(path: string) {
   const res = await fetch(path);
-  if (!res.ok) throw new Error(path);
+  if (!res.ok) throw new Error(await responseError(res, path));
+  return res.json();
+}
+
+async function responseError(res: Response, fallback: string) {
+  try {
+    const data = await res.json();
+    if (typeof data.error === "string") return data.error;
+    if (data.error) return JSON.stringify(data.error);
+  } catch {}
+  return fallback;
+}
+
+async function sendJson(path: string, options: RequestInit) {
+  const res = await fetch(path, options);
+  if (!res.ok) throw new Error(await responseError(res, "Request failed"));
   return res.json();
 }
 
@@ -16,16 +31,19 @@ export function AdminDashboard({ adminName }: { adminName: string }) {
   const [tab, setTab] = useState("Overview");
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
+    setNotice(null);
     try {
-      const [dashboard, orders, vouchers, hostels, plans, tickets, policies, customers, sales, hostelReports, planReports, voucherReports, failed] = await Promise.all([
+      const [dashboard, orders, vouchers, hostels, plans, settings, tickets, policies, customers, sales, hostelReports, planReports, voucherReports, failed] = await Promise.all([
         getJson("/api/admin/dashboard"),
         getJson("/api/admin/orders"),
         getJson("/api/admin/vouchers"),
         getJson("/api/admin/hostels"),
         getJson("/api/admin/plans"),
+        getJson("/api/admin/settings/payment"),
         getJson("/api/admin/support"),
         getJson("/api/admin/policies"),
         getJson("/api/admin/customers"),
@@ -35,7 +53,9 @@ export function AdminDashboard({ adminName }: { adminName: string }) {
         getJson("/api/admin/reports/vouchers"),
         getJson("/api/admin/reports/failed-payments")
       ]);
-      setData({ dashboard, orders, vouchers, hostels, plans, tickets, policies, customers, sales, hostelReports, planReports, voucherReports, failed });
+      setData({ dashboard, orders, vouchers, hostels, plans, settings, tickets, policies, customers, sales, hostelReports, planReports, voucherReports, failed });
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to load admin data.");
     } finally {
       setLoading(false);
     }
@@ -71,11 +91,13 @@ export function AdminDashboard({ adminName }: { adminName: string }) {
           ))}
         </div>
         <section className="mt-4">
+          {notice ? <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{notice}</div> : null}
           {tab === "Overview" ? <Overview metrics={data.dashboard?.metrics} /> : null}
           {tab === "Orders" ? <Orders rows={data.orders?.orders || []} reload={load} /> : null}
           {tab === "Vouchers" ? <Vouchers rows={data.vouchers?.vouchers || []} reload={load} /> : null}
           {tab === "Hostels" ? <Hostels rows={data.hostels?.hostels || []} reload={load} /> : null}
           {tab === "Plans" ? <Plans rows={data.plans?.plans || []} reload={load} /> : null}
+          {tab === "Settings" ? <Settings bank={data.settings?.bank} reload={load} /> : null}
           {tab === "Support" ? <Support rows={data.tickets?.tickets || []} reload={load} /> : null}
           {tab === "Reports" ? <Reports data={data} /> : null}
           {tab === "Policies" ? <Policies rows={data.policies?.policies || []} reload={load} /> : null}
@@ -104,23 +126,32 @@ function Overview({ metrics }: { metrics?: any }) {
 }
 
 function Orders({ rows, reload }: { rows: any[]; reload: () => void }) {
+  const [error, setError] = useState<string | null>(null);
   async function action(path: string, method = "PATCH", body?: any) {
-    await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
-    reload();
+    setError(null);
+    try {
+      await sendJson(path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Order action failed.");
+    }
   }
   return (
-    <Table headers={["Reference", "Customer", "Hostel", "Plan", "Amount", "Payment", "Voucher", "Actions"]}>
-      {rows.map((o) => (
-        <tr key={o.id}>
-          <td>{o.reference}</td><td>{o.fullName}<br /><span>{o.phone}</span></td><td>{o.hostel.name}</td><td>{o.plan.name}</td><td>{money(o.amount)}</td><td>{o.paymentStatus}</td><td>{o.voucher?.code || "-"}</td>
-          <td className="min-w-48">
-            {o.paymentStatus === "awaiting_bank_confirmation" ? <button className="btn btn-primary mr-2 px-3 py-2 text-xs" onClick={() => action(`/api/admin/orders/${o.id}/confirm-bank-transfer`)}>Confirm</button> : null}
-            {o.paymentStatus === "awaiting_bank_confirmation" ? <button className="btn btn-ghost mr-2 px-3 py-2 text-xs" onClick={() => action(`/api/admin/orders/${o.id}/reject-bank-transfer`, "PATCH", { reason: "Payment not confirmed" })}>Reject</button> : null}
-            {o.voucher ? <button className="btn btn-ghost px-3 py-2 text-xs" onClick={() => action(`/api/admin/orders/${o.id}/resend-voucher`, "POST")}>Resend</button> : null}
-          </td>
-        </tr>
-      ))}
-    </Table>
+    <>
+      {error ? <FormMessage type="error">{error}</FormMessage> : null}
+      <Table headers={["Reference", "Customer", "Hostel", "Plan", "Amount", "Payment", "Voucher", "Actions"]}>
+        {rows.map((o) => (
+          <tr key={o.id}>
+            <td>{o.reference}</td><td>{o.fullName}<br /><span>{o.phone}</span></td><td>{o.hostel.name}</td><td>{o.plan.name}</td><td>{money(o.amount)}</td><td>{o.paymentStatus}</td><td>{o.voucher?.code || "-"}</td>
+            <td className="min-w-48">
+              {o.paymentStatus === "awaiting_bank_confirmation" ? <button className="btn btn-primary mr-2 px-3 py-2 text-xs" onClick={() => action(`/api/admin/orders/${o.id}/confirm-bank-transfer`)}>Confirm</button> : null}
+              {o.paymentStatus === "awaiting_bank_confirmation" ? <button className="btn btn-ghost mr-2 px-3 py-2 text-xs" onClick={() => action(`/api/admin/orders/${o.id}/reject-bank-transfer`, "PATCH", { reason: "Payment not confirmed" })}>Reject</button> : null}
+              {o.voucher ? <button className="btn btn-ghost px-3 py-2 text-xs" onClick={() => action(`/api/admin/orders/${o.id}/resend-voucher`, "POST")}>Resend</button> : null}
+            </td>
+          </tr>
+        ))}
+      </Table>
+    </>
   );
 }
 
@@ -133,20 +164,69 @@ function Vouchers({ rows, reload }: { rows: any[]; reload: () => void }) {
 }
 
 function Hostels({ rows, reload }: { rows: any[]; reload: () => void }) {
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   async function submit(formData: FormData) {
-    await fetch("/api/admin/hostels", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(formData)) });
-    reload();
+    setMessage(null);
+    try {
+      await sendJson("/api/admin/hostels", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(formData)) });
+      setMessage({ type: "success", text: "Hostel added." });
+      await reload();
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to add hostel." });
+    }
   }
-  return <><AdminForm action={submit} fields={["name", "address", "wifiSsid", "supportPhone"]} button="Add hostel" /><Table headers={["Name", "Address", "SSID", "Support", "Status"]}>{rows.map((h) => <tr key={h.id}><td>{h.name}</td><td>{h.address}</td><td>{h.wifiSsid}</td><td>{h.supportPhone}</td><td>{h.status}</td></tr>)}</Table></>;
+  return <>{message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}<AdminForm action={submit} fields={["name", "address", "wifiSsid", "supportPhone"]} button="Add hostel" /><Table headers={["Name", "Address", "SSID", "Support", "Status"]}>{rows.map((h) => <tr key={h.id}><td>{h.name}</td><td>{h.address}</td><td>{h.wifiSsid}</td><td>{h.supportPhone}</td><td>{h.status}</td></tr>)}</Table></>;
 }
 
 function Plans({ rows, reload }: { rows: any[]; reload: () => void }) {
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   async function submit(formData: FormData) {
     const obj = Object.fromEntries(formData);
-    await fetch("/api/admin/plans", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...obj, assignAllHostels: true, includesTv: obj.includesTv === "on" }) });
-    reload();
+    setMessage(null);
+    try {
+      await sendJson("/api/admin/plans", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...obj, assignAllHostels: true, includesTv: obj.includesTv === "on" }) });
+      setMessage({ type: "success", text: "Plan added." });
+      await reload();
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to add plan." });
+    }
   }
-  return <><form action={submit} className="card mb-5 grid gap-3 p-4 md:grid-cols-4"><input className="field" name="name" placeholder="Plan name" required /><input className="field" name="price" type="number" placeholder="Price" required /><input className="field" name="validityDays" type="number" placeholder="Validity days" required /><input className="field" name="deviceLimit" type="number" placeholder="Devices" required /><select className="field" name="dataType"><option value="unlimited">Unlimited</option><option value="limited">Limited</option></select><input className="field" name="dataSizeGb" type="number" placeholder="GB optional" /><input className="field" name="badge" placeholder="Badge" /><label className="flex items-center gap-2 text-sm font-semibold"><input name="includesTv" type="checkbox" /> TV access</label><button className="btn btn-primary md:col-span-4">Add plan</button></form><Table headers={["Name", "Price", "Data", "Validity", "Devices", "TV", "Status"]}>{rows.map((p) => <tr key={p.id}><td>{p.name}</td><td>{money(p.price)}</td><td>{p.dataType === "limited" ? `${p.dataSizeGb}GB` : "Unlimited"}</td><td>{p.validityDays} days</td><td>{p.deviceLimit}</td><td>{p.includesTv ? "Yes" : "No"}</td><td>{p.status}</td></tr>)}</Table></>;
+  return <>{message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}<form action={submit} className="card mb-5 grid gap-3 p-4 md:grid-cols-4"><input className="field" name="name" placeholder="Plan name" required /><input className="field" name="price" type="number" min="1" placeholder="Price" required /><input className="field" name="validityDays" type="number" min="1" placeholder="Validity days" required /><input className="field" name="deviceLimit" type="number" min="1" placeholder="Devices" required /><select className="field" name="dataType"><option value="unlimited">Unlimited</option><option value="limited">Limited</option></select><input className="field" name="dataSizeGb" type="number" min="1" placeholder="GB optional" /><input className="field" name="badge" placeholder="Badge" /><label className="flex items-center gap-2 text-sm font-semibold"><input name="includesTv" type="checkbox" /> TV access</label><button className="btn btn-primary md:col-span-4">Add plan</button></form><Table headers={["Name", "Price", "Data", "Validity", "Devices", "TV", "Status"]}>{rows.map((p) => <tr key={p.id}><td>{p.name}</td><td>{money(p.price)}</td><td>{p.dataType === "limited" ? `${p.dataSizeGb}GB` : "Unlimited"}</td><td>{p.validityDays} days</td><td>{p.deviceLimit}</td><td>{p.includesTv ? "Yes" : "No"}</td><td>{p.status}</td></tr>)}</Table></>;
+}
+
+function Settings({ bank, reload }: { bank?: any; reload: () => void }) {
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+
+  async function save(formData: FormData) {
+    setMessage(null);
+    try {
+      const response = await sendJson("/api/admin/settings/payment", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountNumber: formData.get("accountNumber"),
+          bankName: formData.get("bankName"),
+          accountName: formData.get("accountName")
+        })
+      });
+      setMessage({ type: response.demo ? "error" : "success", text: response.message || "Payment account updated." });
+      await reload();
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to update payment account." });
+    }
+  }
+
+  return (
+    <div className="grid gap-5">
+      {message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}
+      <form action={save} className="card grid gap-3 p-4 md:grid-cols-3">
+        <label className="grid gap-2 text-sm font-semibold">Account number<input className="field" name="accountNumber" defaultValue={bank?.accountNumber || ""} required /></label>
+        <label className="grid gap-2 text-sm font-semibold">Bank name<input className="field" name="bankName" defaultValue={bank?.bankName || ""} required /></label>
+        <label className="grid gap-2 text-sm font-semibold">Account name<input className="field" name="accountName" defaultValue={bank?.accountName || ""} required /></label>
+        <button className="btn btn-primary md:col-span-3">Save payment account</button>
+      </form>
+    </div>
+  );
 }
 
 function Support({ rows, reload }: { rows: any[]; reload: () => void }) {
@@ -181,4 +261,9 @@ function Table({ headers, children }: { headers: string[]; children: React.React
 
 function AdminForm({ action, fields, button }: { action: (formData: FormData) => void; fields: string[]; button: string }) {
   return <form action={action} className="card mb-5 grid gap-3 p-4 md:grid-cols-4">{fields.map((field) => <input key={field} className="field" name={field} placeholder={field} required={field === "name"} />)}<button className="btn btn-primary md:col-span-4">{button}</button></form>;
+}
+
+function FormMessage({ type, children }: { type: "error" | "success"; children: React.ReactNode }) {
+  const styles = type === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700";
+  return <div className={`mb-4 rounded-lg border p-3 text-sm font-semibold ${styles}`}>{children}</div>;
 }

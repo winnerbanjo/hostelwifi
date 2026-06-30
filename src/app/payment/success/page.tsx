@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, MessageCircle } from "lucide-react";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { demoOrder, hasDatabaseUrl } from "@/lib/demo-data";
-import { completePaidOrder } from "@/lib/orders";
-import { verifyPaystack } from "@/lib/paystack";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { money, whatsappLink } from "@/lib/constants";
@@ -11,35 +9,21 @@ import { CopyButton } from "@/components/copy-button";
 
 export default async function PaymentSuccessPage({ searchParams }: { searchParams: Promise<{ reference?: string; demo?: string; planId?: string; hostelId?: string }> }) {
   const { reference, planId, hostelId } = await searchParams;
-  let order = reference
+  const order = reference
     ? hasDatabaseUrl
-      ? await prisma.order.findUnique({ where: { reference }, include: { hostel: true, plan: true, voucher: true } })
-      : demoOrder(reference, "paystack", planId, hostelId)
+      ? await db.order.findUnique({ where: { reference }, include: { hostel: true, plan: true, voucher: true } })
+      : demoOrder(reference, "bank_transfer", planId, hostelId)
     : null;
-  let error = "";
-
-  if (hasDatabaseUrl && reference && order?.paymentMethod === "paystack" && !order.voucher) {
-    try {
-      const verification = await verifyPaystack(reference);
-      if (verification.status && verification.data?.status === "success") {
-        order = await completePaidOrder(reference, "paystack", verification);
-      } else {
-        error = "Payment could not be verified.";
-      }
-    } catch (err) {
-      error = err instanceof Error ? err.message : "Payment verification failed.";
-    }
-  }
 
   return (
     <>
       <SiteHeader />
       <main className="bg-slate-50 py-10">
         <div className="container max-w-3xl">
-          {!order || error ? (
+          {!order || !order.voucher ? (
             <div className="card p-7 text-center">
-              <h1 className="text-2xl font-black text-ink">Payment verification pending</h1>
-              <p className="mt-2 text-slate-600">{error || "We could not find this order yet."}</p>
+              <h1 className="text-2xl font-black text-ink">Voucher not ready yet</h1>
+              <p className="mt-2 text-slate-600">Bank transfers are confirmed by admin before voucher release.</p>
               <Link href="/support" className="btn btn-primary mt-6">Contact support</Link>
             </div>
           ) : (

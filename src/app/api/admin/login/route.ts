@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { demoAdmin } from "@/lib/admin-demo";
 import { hasDatabaseUrl } from "@/lib/demo-data";
 import { setAdminSession } from "@/lib/auth";
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     await setAdminSession(demoAdmin.id);
     return NextResponse.json({ admin: demoAdmin, demo: true });
   }
-  const admin = await prisma.adminUser.findUnique({ where: { email: parsed.data.email } });
+  const admin = await db.adminUser.findUnique({ where: { email: parsed.data.email } });
   if (!admin || admin.status !== "active") return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   const ok = await bcrypt.compare(parsed.data.password, admin.passwordHash);
   if (!ok) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });

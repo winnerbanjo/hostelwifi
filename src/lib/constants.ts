@@ -6,9 +6,9 @@ export const business = {
   email: "Cooltake4@gmail.com",
   address: "No 5, back of Yemkem, Iworoko Ekiti, Ekiti State",
   bank: {
-    accountNumber: "6141688034",
-    bankName: "OPay",
-    accountName: "OLADIMEJI FEMI ARIYO"
+    accountNumber: process.env.BANK_ACCOUNT_NUMBER || "6141688034",
+    bankName: process.env.BANK_NAME || "OPay",
+    accountName: process.env.BANK_ACCOUNT_NAME || "OLADIMEJI FEMI ARIYO"
   }
 };
 
