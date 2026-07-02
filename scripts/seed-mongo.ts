@@ -32,6 +32,8 @@ async function ensureIndexes() {
     mongo.collection("customers").createIndex({ email: 1, phone: 1 }, { unique: true }),
     mongo.collection("orders").createIndex({ reference: 1 }, { unique: true }),
     mongo.collection("orders").createIndex({ paystackReference: 1 }, { unique: true, sparse: true }),
+    mongo.collection("walletTransactions").createIndex({ customerId: 1, createdAt: -1 }),
+    mongo.collection("walletTransactions").createIndex({ type: 1, status: 1, createdAt: -1 }),
     mongo.collection("vouchers").createIndex({ code: 1 }, { unique: true }),
     mongo.collection("vouchers").createIndex({ orderId: 1 }, { unique: true }),
     mongo.collection("policyPages").createIndex({ slug: 1 }, { unique: true })

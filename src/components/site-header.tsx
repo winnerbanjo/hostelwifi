@@ -16,6 +16,7 @@ export function SiteHeader() {
           <Link href="/plans">Plans</Link>
           <Link href="/voucher-checker">Check Voucher</Link>
           <Link href="/support">Support</Link>
+          <Link href="/account">Account</Link>
         </nav>
         <a className="btn btn-secondary px-3 py-2 text-sm" href={whatsappLink("Hello Jendor The Plug, I need internet support.")}>
           <MessageCircle size={16} /> WhatsApp

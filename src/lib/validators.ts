@@ -33,3 +33,28 @@ export const adminLoginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6)
 });
+
+export const customerSignupSchema = z.object({
+  fullName: z.string().min(2),
+  phone: z.string().min(8),
+  email: z.string().email(),
+  password: z.string().min(6)
+});
+
+export const customerLoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6)
+});
+
+export const walletTopupSchema = z.object({
+  amount: z.coerce.number().int().positive(),
+  bankTransferReference: z.string().optional().default(""),
+  bankTransferProofUrl: z.string().optional().default("")
+});
+
+export const walletOrderSchema = z.object({
+  hostelId: z.string().min(1),
+  planId: z.string().min(1),
+  roomNumber: z.string().min(1),
+  blockFloor: z.string().optional().default("")
+});

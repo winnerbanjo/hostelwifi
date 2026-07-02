@@ -5,6 +5,7 @@ import { demoAdmin } from "@/lib/admin-demo";
 import { hasDatabaseUrl } from "@/lib/demo-data";
 
 const cookieName = "jtp_admin_session";
+const customerCookieName = "jtp_customer_session";
 
 function secret() {
   return process.env.ADMIN_SESSION_SECRET || "dev-only-change-me";
@@ -54,4 +55,45 @@ export async function requireAdmin() {
   const admin = await getAdmin();
   if (!admin) throw new Error("Unauthorized");
   return admin;
+}
+
+export async function setCustomerSession(customerId: string) {
+  const payload = JSON.stringify({ customerId, exp: Date.now() + 1000 * 60 * 60 * 24 * 30 });
+  const value = Buffer.from(payload).toString("base64url");
+  const signature = sign(value);
+  const jar = await cookies();
+  jar.set(customerCookieName, `${value}.${signature}`, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30
+  });
+}
+
+export async function clearCustomerSession() {
+  const jar = await cookies();
+  jar.delete(customerCookieName);
+}
+
+export async function getCustomer() {
+  const jar = await cookies();
+  const token = jar.get(customerCookieName)?.value;
+  if (!token) return null;
+  const [value, signature] = token.split(".");
+  if (!value || !signature) return null;
+  const expected = sign(value);
+  const ok =
+    expected.length === signature.length &&
+    timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  if (!ok) return null;
+  const payload = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as { customerId: string; exp: number };
+  if (payload.exp < Date.now()) return null;
+  return db.customer.findFirst({ where: { id: payload.customerId } });
+}
+
+export async function requireCustomer() {
+  const customer = await getCustomer();
+  if (!customer) throw new Error("Unauthorized");
+  return customer;
 }

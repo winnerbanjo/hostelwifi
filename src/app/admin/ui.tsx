@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, LogOut, RefreshCw } from "lucide-react";
 import { money, whatsappLink } from "@/lib/constants";
 
-const tabs = ["Overview", "Orders", "Vouchers", "Hostels", "Plans", "Settings", "Support", "Reports", "Policies", "Customers"];
+const tabs = ["Overview", "Orders", "Vouchers", "Hostels", "Plans", "Wallet", "Settings", "Support", "Reports", "Policies", "Customers"];
 
 async function getJson(path: string) {
   const res = await fetch(path);
@@ -37,12 +37,13 @@ export function AdminDashboard({ adminName }: { adminName: string }) {
     setLoading(true);
     setNotice(null);
     try {
-      const [dashboard, orders, vouchers, hostels, plans, settings, tickets, policies, customers, sales, hostelReports, planReports, voucherReports, failed] = await Promise.all([
+      const [dashboard, orders, vouchers, hostels, plans, walletTopups, settings, tickets, policies, customers, sales, hostelReports, planReports, voucherReports, failed] = await Promise.all([
         getJson("/api/admin/dashboard"),
         getJson("/api/admin/orders"),
         getJson("/api/admin/vouchers"),
         getJson("/api/admin/hostels"),
         getJson("/api/admin/plans"),
+        getJson("/api/admin/wallet-topups"),
         getJson("/api/admin/settings/payment"),
         getJson("/api/admin/support"),
         getJson("/api/admin/policies"),
@@ -53,7 +54,7 @@ export function AdminDashboard({ adminName }: { adminName: string }) {
         getJson("/api/admin/reports/vouchers"),
         getJson("/api/admin/reports/failed-payments")
       ]);
-      setData({ dashboard, orders, vouchers, hostels, plans, settings, tickets, policies, customers, sales, hostelReports, planReports, voucherReports, failed });
+      setData({ dashboard, orders, vouchers, hostels, plans, walletTopups, settings, tickets, policies, customers, sales, hostelReports, planReports, voucherReports, failed });
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Unable to load admin data.");
     } finally {
@@ -97,6 +98,7 @@ export function AdminDashboard({ adminName }: { adminName: string }) {
           {tab === "Vouchers" ? <Vouchers rows={data.vouchers?.vouchers || []} reload={load} /> : null}
           {tab === "Hostels" ? <Hostels rows={data.hostels?.hostels || []} reload={load} /> : null}
           {tab === "Plans" ? <Plans rows={data.plans?.plans || []} reload={load} /> : null}
+          {tab === "Wallet" ? <WalletTopups rows={data.walletTopups?.topups || []} reload={load} /> : null}
           {tab === "Settings" ? <Settings bank={data.settings?.bank} reload={load} /> : null}
           {tab === "Support" ? <Support rows={data.tickets?.tickets || []} reload={load} /> : null}
           {tab === "Reports" ? <Reports data={data} /> : null}
@@ -175,7 +177,41 @@ function Hostels({ rows, reload }: { rows: any[]; reload: () => void }) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to add hostel." });
     }
   }
-  return <>{message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}<AdminForm action={submit} fields={["name", "address", "wifiSsid", "supportPhone"]} button="Add hostel" /><Table headers={["Name", "Address", "SSID", "Support", "Status"]}>{rows.map((h) => <tr key={h.id}><td>{h.name}</td><td>{h.address}</td><td>{h.wifiSsid}</td><td>{h.supportPhone}</td><td>{h.status}</td></tr>)}</Table></>;
+  async function save(id: string, formData: FormData) {
+    setMessage(null);
+    try {
+      await sendJson(`/api/admin/hostels/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(formData))
+      });
+      setMessage({ type: "success", text: "Hostel updated." });
+      await reload();
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to update hostel." });
+    }
+  }
+  return (
+    <>
+      {message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}
+      <AdminForm action={submit} fields={["name", "address", "wifiSsid", "supportPhone"]} button="Add hostel" />
+      <div className="grid gap-4">
+        {rows.map((h) => (
+          <form key={h.id} action={save.bind(null, h.id)} className="card grid gap-3 p-4 md:grid-cols-5">
+            <input className="field" name="name" defaultValue={h.name} required />
+            <input className="field" name="address" defaultValue={h.address || ""} />
+            <input className="field" name="wifiSsid" defaultValue={h.wifiSsid || ""} />
+            <input className="field" name="supportPhone" defaultValue={h.supportPhone || ""} />
+            <select className="field" name="status" defaultValue={h.status || "active"}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <button className="btn btn-primary md:col-span-5">Save hostel</button>
+          </form>
+        ))}
+      </div>
+    </>
+  );
 }
 
 function Plans({ rows, reload }: { rows: any[]; reload: () => void }) {
@@ -191,7 +227,95 @@ function Plans({ rows, reload }: { rows: any[]; reload: () => void }) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to add plan." });
     }
   }
-  return <>{message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}<form action={submit} className="card mb-5 grid gap-3 p-4 md:grid-cols-4"><input className="field" name="name" placeholder="Plan name" required /><input className="field" name="price" type="number" min="1" placeholder="Price" required /><input className="field" name="validityDays" type="number" min="1" placeholder="Validity days" required /><input className="field" name="deviceLimit" type="number" min="1" placeholder="Devices" required /><select className="field" name="dataType"><option value="unlimited">Unlimited</option><option value="limited">Limited</option></select><input className="field" name="dataSizeGb" type="number" min="1" placeholder="GB optional" /><input className="field" name="badge" placeholder="Badge" /><label className="flex items-center gap-2 text-sm font-semibold"><input name="includesTv" type="checkbox" /> TV access</label><button className="btn btn-primary md:col-span-4">Add plan</button></form><Table headers={["Name", "Price", "Data", "Validity", "Devices", "TV", "Status"]}>{rows.map((p) => <tr key={p.id}><td>{p.name}</td><td>{money(p.price)}</td><td>{p.dataType === "limited" ? `${p.dataSizeGb}GB` : "Unlimited"}</td><td>{p.validityDays} days</td><td>{p.deviceLimit}</td><td>{p.includesTv ? "Yes" : "No"}</td><td>{p.status}</td></tr>)}</Table></>;
+  async function save(id: string, formData: FormData) {
+    const obj = Object.fromEntries(formData);
+    setMessage(null);
+    try {
+      await sendJson(`/api/admin/plans/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...obj, includesTv: obj.includesTv === "on" })
+      });
+      setMessage({ type: "success", text: "Plan updated." });
+      await reload();
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to update plan." });
+    }
+  }
+  return (
+    <>
+      {message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}
+      <form action={submit} className="card mb-5 grid gap-3 p-4 md:grid-cols-4">
+        <input className="field" name="name" placeholder="Plan name" required />
+        <input className="field" name="price" type="number" min="1" placeholder="Price" required />
+        <input className="field" name="validityDays" type="number" min="1" placeholder="Validity days" required />
+        <input className="field" name="deviceLimit" type="number" min="1" placeholder="Devices" required />
+        <select className="field" name="dataType"><option value="unlimited">Unlimited</option><option value="limited">Limited</option></select>
+        <input className="field" name="dataSizeGb" type="number" min="1" placeholder="GB optional" />
+        <input className="field" name="badge" placeholder="Badge" />
+        <label className="flex items-center gap-2 text-sm font-semibold"><input name="includesTv" type="checkbox" /> TV access</label>
+        <button className="btn btn-primary md:col-span-4">Add plan</button>
+      </form>
+      <div className="grid gap-4">
+        {rows.map((p) => (
+          <form key={p.id} action={save.bind(null, p.id)} className="card grid gap-3 p-4 md:grid-cols-6">
+            <input className="field" name="name" defaultValue={p.name} required />
+            <input className="field" name="price" type="number" min="1" defaultValue={p.price} required />
+            <input className="field" name="validityDays" type="number" min="1" defaultValue={p.validityDays} required />
+            <input className="field" name="deviceLimit" type="number" min="1" defaultValue={p.deviceLimit} required />
+            <select className="field" name="dataType" defaultValue={p.dataType || "unlimited"}>
+              <option value="unlimited">Unlimited</option>
+              <option value="limited">Limited</option>
+            </select>
+            <input className="field" name="dataSizeGb" type="number" min="1" defaultValue={p.dataSizeGb || ""} placeholder="GB" />
+            <input className="field md:col-span-2" name="description" defaultValue={p.description || ""} placeholder="Description" />
+            <input className="field" name="badge" defaultValue={p.badge || ""} placeholder="Badge" />
+            <select className="field" name="status" defaultValue={p.status || "active"}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <label className="flex items-center gap-2 text-sm font-semibold"><input name="includesTv" type="checkbox" defaultChecked={p.includesTv} /> TV access</label>
+            <button className="btn btn-primary md:col-span-6">Save plan</button>
+          </form>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function WalletTopups({ rows, reload }: { rows: any[]; reload: () => void }) {
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  async function review(id: string, action: "confirm" | "reject") {
+    setMessage(null);
+    try {
+      await sendJson(`/api/admin/wallet-topups/${id}/${action}`, { method: "PATCH" });
+      setMessage({ type: "success", text: action === "confirm" ? "Top-up confirmed." : "Top-up rejected." });
+      await reload();
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to review top-up." });
+    }
+  }
+  return (
+    <>
+      {message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}
+      <Table headers={["Customer", "Amount", "Reference", "Proof", "Status", "Date", "Actions"]}>
+        {rows.map((t) => (
+          <tr key={t.id}>
+            <td>{t.customer?.fullName || "-"}<br /><span>{t.customer?.phone || t.customer?.email || "-"}</span></td>
+            <td>{money(t.amount)}</td>
+            <td>{t.bankTransferReference || "-"}</td>
+            <td>{t.bankTransferProofUrl ? <a className="font-bold text-brand" href={t.bankTransferProofUrl} target="_blank">Open</a> : "-"}</td>
+            <td>{t.status}</td>
+            <td>{new Date(t.createdAt).toLocaleDateString()}</td>
+            <td>
+              {t.status === "awaiting_confirmation" ? <button className="btn btn-primary mr-2 px-3 py-2 text-xs" onClick={() => review(t.id, "confirm")}>Confirm</button> : null}
+              {t.status === "awaiting_confirmation" ? <button className="btn btn-ghost px-3 py-2 text-xs" onClick={() => review(t.id, "reject")}>Reject</button> : null}
+            </td>
+          </tr>
+        ))}
+      </Table>
+    </>
+  );
 }
 
 function Settings({ bank, reload }: { bank?: any; reload: () => void }) {
@@ -252,7 +376,7 @@ function Policies({ rows, reload }: { rows: any[]; reload: () => void }) {
 }
 
 function Customers({ rows }: { rows: any[] }) {
-  return <Table headers={["Name", "Phone", "Email", "Orders", "Joined"]}>{rows.map((c) => <tr key={c.id}><td>{c.fullName}</td><td>{c.phone}</td><td>{c.email}</td><td>{c.orders.length}</td><td>{new Date(c.createdAt).toLocaleDateString()}</td></tr>)}</Table>;
+  return <Table headers={["Name", "Phone", "Email", "Wallet", "Orders", "Joined"]}>{rows.map((c) => <tr key={c.id}><td>{c.fullName}</td><td>{c.phone}</td><td>{c.email}</td><td>{money(c.walletBalance || 0)}</td><td>{c.orders.length}</td><td>{new Date(c.createdAt).toLocaleDateString()}</td></tr>)}</Table>;
 }
 
 function Table({ headers, children }: { headers: string[]; children: React.ReactNode }) {

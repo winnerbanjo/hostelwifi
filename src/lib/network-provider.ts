@@ -11,7 +11,7 @@ export type VoucherInput = {
 };
 
 export interface NetworkProvider {
-  generateVoucher(input: VoucherInput, tx?: typeof db): Promise<any>;
+  generateVoucher(input: VoucherInput, tx?: any): Promise<any>;
   revokeVoucher(voucherCode: string): Promise<any>;
   checkVoucherStatus(voucherCode: string): Promise<any | null>;
 }
@@ -22,7 +22,7 @@ function segment() {
 }
 
 export class InternalVoucherProvider implements NetworkProvider {
-  async generateVoucher(input: VoucherInput, tx: typeof db = db) {
+  async generateVoucher(input: VoucherInput, tx: any = db) {
     const existing = await tx.voucher.findUnique({ where: { orderId: input.orderId } });
     if (existing) return existing;
 

@@ -13,6 +13,7 @@ type ModelName =
   | "paymentLog"
   | "supportTicket"
   | "policyPage"
+  | "walletTransaction"
   | "auditLog"
   | "businessSettings";
 
@@ -27,6 +28,7 @@ const collectionNames: Record<ModelName, string> = {
   paymentLog: "paymentLogs",
   supportTicket: "supportTickets",
   policyPage: "policyPages",
+  walletTransaction: "walletTransactions",
   auditLog: "auditLogs",
   businessSettings: "businessSettings"
 };
@@ -259,6 +261,12 @@ async function includeRelations(name: ModelName, row: AnyRecord, include: AnyRec
   if (name === "customer" && include.orders) {
     result.orders = await db.order.findMany({ where: { customerId: row.id }, orderBy: { createdAt: "desc" } });
   }
+  if (name === "customer" && include.walletTransactions) {
+    result.walletTransactions = await db.walletTransaction.findMany({ where: { customerId: row.id }, orderBy: { createdAt: "desc" } });
+  }
+  if (name === "walletTransaction" && include.customer && row.customerId) {
+    result.customer = await db.customer.findUnique({ where: { id: row.customerId } });
+  }
   if (name === "supportTicket" && include.order && row.orderId) {
     result.order = await db.order.findUnique({ where: { id: row.orderId } });
   }
@@ -285,9 +293,10 @@ export const db = {
   paymentLog: new MongoModel("paymentLog"),
   supportTicket: new MongoModel("supportTicket"),
   policyPage: new MongoModel("policyPage"),
+  walletTransaction: new MongoModel("walletTransaction"),
   auditLog: new MongoModel("auditLog"),
   businessSettings: new MongoModel("businessSettings"),
-  $transaction<T>(callback: (tx: typeof db) => Promise<T>) {
+  $transaction<T>(callback: (tx: any) => Promise<T>) {
     return callback(db);
   },
   async $disconnect() {
