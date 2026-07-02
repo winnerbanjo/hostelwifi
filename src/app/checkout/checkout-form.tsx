@@ -16,10 +16,12 @@ export function CheckoutForm({ hostels, plans, initialHostelId, initialPlanId }:
   const [hostelId, setHostelId] = useState(initialHostelId || hostels[0]?.id || "");
   const [planId, setPlanId] = useState(initialPlanId || plans[0]?.id || "");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const selectedPlan = plans.find((plan) => plan.id === planId);
 
   async function submit(formData: FormData) {
     setLoading(true);
+    setError(null);
     const payload = {
       hostelId,
       planId,
@@ -30,19 +32,23 @@ export function CheckoutForm({ hostels, plans, initialHostelId, initialPlanId }:
       blockFloor: String(formData.get("blockFloor") || ""),
       paymentMethod: "bank_transfer"
     };
-    const orderRes = await fetch("/api/orders/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    const orderJson = await orderRes.json();
-    if (!orderRes.ok) {
-      alert("Please check your checkout details.");
+    try {
+      const orderRes = await fetch("/api/orders/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const orderJson = await orderRes.json().catch(() => ({}));
+      if (!orderRes.ok || !orderJson.order?.reference) {
+        throw new Error(typeof orderJson.error === "string" ? orderJson.error : "Please check your checkout details.");
+      }
+      router.push(`/payment/bank-transfer?reference=${encodeURIComponent(orderJson.order.reference)}&planId=${encodeURIComponent(planId)}&hostelId=${encodeURIComponent(hostelId)}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Please check your checkout details.");
       setLoading(false);
-      return;
     }
-    router.push(`/payment/bank-transfer?reference=${orderJson.order.reference}&planId=${planId}&hostelId=${hostelId}`);
   }
 
   return (
     <form action={submit} className="grid gap-5 lg:grid-cols-[1fr_360px]">
       <div className="card p-5">
+        {error ? <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div> : null}
         <div className="grid gap-4 md:grid-cols-2">
           <label className="grid gap-2 text-sm font-semibold">Hostel<select className="field" value={hostelId} onChange={(event) => setHostelId(event.target.value)}>{hostels.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}</select></label>
           <label className="grid gap-2 text-sm font-semibold">Plan<select className="field" value={planId} onChange={(event) => setPlanId(event.target.value)}>{plans.map((p) => <option key={p.id} value={p.id}>{p.name} - {money(p.price)}</option>)}</select></label>
@@ -64,7 +70,7 @@ export function CheckoutForm({ hostels, plans, initialHostelId, initialPlanId }:
           <p>Devices: {selectedPlan?.deviceLimit}</p>
           <p>Payment: Bank transfer</p>
         </div>
-        <button disabled={loading} className="btn btn-primary mt-6 w-full">{loading ? "Processing..." : "Continue to Bank Transfer"}</button>
+        <button disabled={loading || !hostelId || !planId} className="btn btn-primary mt-6 w-full">{loading ? "Processing..." : "Continue to Bank Transfer"}</button>
       </aside>
     </form>
   );

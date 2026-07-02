@@ -14,6 +14,7 @@ export default async function BankTransferPage({ searchParams }: { searchParams:
       ? await db.order.findUnique({ where: { reference }, include: { plan: true, hostel: true } })
       : demoOrder(reference, "bank_transfer", planId, hostelId)
     : null;
+  const amount = Number(order?.amount || 0);
   return (
     <>
       <SiteHeader />
@@ -25,16 +26,16 @@ export default async function BankTransferPage({ searchParams }: { searchParams:
             {order ? (
               <>
                 <div className="mt-6 grid gap-3 rounded-lg border border-line bg-white p-4 text-sm">
-                  <p><b>Amount:</b> {money(order.amount)}</p>
-                  <p><b>Order reference:</b> {order.reference}</p>
+                  <p><b>Amount:</b> {money(amount)}</p>
+                  <p><b>Order reference:</b> {order.reference || reference}</p>
                   <p><b>Account number:</b> {bank.accountNumber}</p>
                   <p><b>Bank:</b> {bank.bankName}</p>
                   <p><b>Account name:</b> {bank.accountName}</p>
                 </div>
-                <BankTransferForm reference={order.reference} />
+                <BankTransferForm reference={order.reference || reference || ""} />
               </>
             ) : (
-              <p className="mt-5 text-red-600">Order not found.</p>
+              <p className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 font-semibold text-red-700">Order not found. Please go back to checkout and try again.</p>
             )}
             <a className="btn btn-secondary mt-5 w-full" href={whatsappLink(`Hello Jendor The Plug, I made a bank transfer for order ${reference || ""}.`)}>Message support on WhatsApp</a>
           </div>
