@@ -1,5 +1,6 @@
 "use client";
 
+import type { FormEvent } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { money } from "@/lib/constants";
@@ -19,7 +20,9 @@ export function CheckoutForm({ hostels, plans, initialHostelId, initialPlanId }:
   const [error, setError] = useState<string | null>(null);
   const selectedPlan = plans.find((plan) => plan.id === planId);
 
-  async function submit(formData: FormData) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
     setLoading(true);
     setError(null);
     const payload = {
@@ -46,7 +49,7 @@ export function CheckoutForm({ hostels, plans, initialHostelId, initialPlanId }:
   }
 
   return (
-    <form action={submit} className="grid gap-5 lg:grid-cols-[1fr_360px]">
+    <form onSubmit={submit} className="grid gap-5 lg:grid-cols-[1fr_360px]">
       <div className="card p-5">
         {error ? <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div> : null}
         <div className="grid gap-4 md:grid-cols-2">

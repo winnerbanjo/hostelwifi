@@ -1,5 +1,6 @@
 "use client";
 
+import type { FormEvent } from "react";
 import { useState } from "react";
 
 export function BankTransferForm({ reference }: { reference: string }) {
@@ -7,7 +8,9 @@ export function BankTransferForm({ reference }: { reference: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function submit(formData: FormData) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
     setError(null);
     setLoading(true);
     try {
@@ -32,7 +35,7 @@ export function BankTransferForm({ reference }: { reference: string }) {
   return sent ? (
     <div className="mt-5 rounded-lg bg-emerald-50 p-4 font-semibold text-emerald-800">Submitted. Your voucher will be released after confirmation.</div>
   ) : (
-    <form action={submit} className="mt-5 grid gap-3">
+    <form onSubmit={submit} className="mt-5 grid gap-3">
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div> : null}
       <label className="grid gap-2 text-sm font-semibold">Transfer reference<input className="field" name="bankTransferReference" placeholder="Bank app transaction reference" /></label>
       <label className="grid gap-2 text-sm font-semibold">Payment proof URL<input className="field" name="bankTransferProofUrl" placeholder="Optional image/document link" /></label>
