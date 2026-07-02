@@ -318,7 +318,7 @@ function WalletTopups({ rows, reload }: { rows: any[]; reload: () => void }) {
   );
 }
 
-function Settings({ bank, reload }: { bank?: any; reload: () => void }) {
+function BankSettings({ bank, reload }: { bank?: any; reload: () => void }) {
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
 
   async function save(formData: FormData) {
@@ -341,14 +341,70 @@ function Settings({ bank, reload }: { bank?: any; reload: () => void }) {
   }
 
   return (
+    <form action={save} className="card grid gap-3 p-4 md:grid-cols-3">
+      <p className="font-black text-ink md:col-span-3">Payment Bank Details</p>
+      {message ? <div className="md:col-span-3"><FormMessage type={message.type}>{message.text}</FormMessage></div> : null}
+      <label className="grid gap-2 text-sm font-semibold">Account number<input className="field" name="accountNumber" defaultValue={bank?.accountNumber || ""} required /></label>
+      <label className="grid gap-2 text-sm font-semibold">Bank name<input className="field" name="bankName" defaultValue={bank?.bankName || ""} required /></label>
+      <label className="grid gap-2 text-sm font-semibold">Account name<input className="field" name="accountName" defaultValue={bank?.accountName || ""} required /></label>
+      <button className="btn btn-primary md:col-span-3">Save payment account</button>
+    </form>
+  );
+}
+
+function PasswordSettings() {
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+
+  async function save(formData: FormData) {
+    setMessage(null);
+    const currentPassword = String(formData.get("currentPassword") || "").trim();
+    const newPassword = String(formData.get("newPassword") || "").trim();
+    const confirmPassword = String(formData.get("confirmPassword") || "").trim();
+
+    if (!currentPassword || !newPassword) {
+      setMessage({ type: "error", text: "Current password and new password are required." });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setMessage({ type: "error", text: "New passwords do not match." });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setMessage({ type: "error", text: "New password must be at least 6 characters long." });
+      return;
+    }
+
+    try {
+      const response = await sendJson("/api/admin/settings/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      setMessage({ type: response.demo ? "error" : "success", text: response.message || "Password updated successfully." });
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to update password." });
+    }
+  }
+
+  return (
+    <form action={save} className="card grid gap-3 p-4 md:grid-cols-3">
+      <p className="font-black text-ink md:col-span-3">Change Admin Password</p>
+      {message ? <div className="md:col-span-3"><FormMessage type={message.type}>{message.text}</FormMessage></div> : null}
+      <label className="grid gap-2 text-sm font-semibold">Current password<input className="field" name="currentPassword" type="password" required /></label>
+      <label className="grid gap-2 text-sm font-semibold">New password<input className="field" name="newPassword" type="password" required /></label>
+      <label className="grid gap-2 text-sm font-semibold">Confirm new password<input className="field" name="confirmPassword" type="password" required /></label>
+      <button className="btn btn-primary md:col-span-3">Change password</button>
+    </form>
+  );
+}
+
+function Settings({ bank, reload }: { bank?: any; reload: () => void }) {
+  return (
     <div className="grid gap-5">
-      {message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}
-      <form action={save} className="card grid gap-3 p-4 md:grid-cols-3">
-        <label className="grid gap-2 text-sm font-semibold">Account number<input className="field" name="accountNumber" defaultValue={bank?.accountNumber || ""} required /></label>
-        <label className="grid gap-2 text-sm font-semibold">Bank name<input className="field" name="bankName" defaultValue={bank?.bankName || ""} required /></label>
-        <label className="grid gap-2 text-sm font-semibold">Account name<input className="field" name="accountName" defaultValue={bank?.accountName || ""} required /></label>
-        <button className="btn btn-primary md:col-span-3">Save payment account</button>
-      </form>
+      <BankSettings bank={bank} reload={reload} />
+      <PasswordSettings />
     </div>
   );
 }
