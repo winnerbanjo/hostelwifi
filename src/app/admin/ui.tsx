@@ -141,10 +141,10 @@ function Orders({ rows, reload }: { rows: any[]; reload: () => void }) {
   return (
     <>
       {error ? <FormMessage type="error">{error}</FormMessage> : null}
-      <Table headers={["Reference", "Customer", "Hostel", "Plan", "Amount", "Payment", "Voucher", "Actions"]}>
+      <Table headers={["Reference", "Customer", "Hostel", "Plan", "Amount", "Payment", "Receipt", "Voucher", "Actions"]}>
         {rows.map((o) => (
           <tr key={o.id}>
-            <td>{o.reference}</td><td>{o.fullName}<br /><span>{o.phone}</span></td><td>{o.hostel.name}</td><td>{o.plan.name}</td><td>{money(o.amount)}</td><td>{o.paymentStatus}</td><td>{o.voucher?.code || "-"}</td>
+            <td>{o.reference}</td><td>{o.fullName}<br /><span>{o.phone}</span></td><td>{o.hostel.name}</td><td>{o.plan.name}</td><td>{money(o.amount)}</td><td>{o.paymentStatus}</td><td>{o.bankTransferProofUrl ? <a className="font-bold text-brand" href={o.bankTransferProofUrl} target="_blank">Open</a> : "-"}</td><td>{o.voucher?.code || "-"}</td>
             <td className="min-w-48">
               {o.paymentStatus === "awaiting_bank_confirmation" ? <button className="btn btn-primary mr-2 px-3 py-2 text-xs" onClick={() => action(`/api/admin/orders/${o.id}/confirm-bank-transfer`)}>Confirm</button> : null}
               {o.paymentStatus === "awaiting_bank_confirmation" ? <button className="btn btn-ghost mr-2 px-3 py-2 text-xs" onClick={() => action(`/api/admin/orders/${o.id}/reject-bank-transfer`, "PATCH", { reason: "Payment not confirmed" })}>Reject</button> : null}
