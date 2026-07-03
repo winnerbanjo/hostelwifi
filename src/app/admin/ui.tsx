@@ -216,11 +216,34 @@ function Hostels({ rows, reload }: { rows: any[]; reload: () => void }) {
 
 function Plans({ rows, reload }: { rows: any[]; reload: () => void }) {
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [hostels, setHostels] = useState<any[]>([]);
+  const [selectedHostelIds, setSelectedHostelIds] = useState<string[]>([]);
+
+  // Load hostels for selection
+  async function loadHostels() {
+    try {
+      const data = await getJson("/api/admin/hostels");
+      setHostels(data.hostels || []);
+    } catch (e) {
+      console.error("Failed to load hostels", e);
+    }
+  }
+
+  useEffect(() => {
+    loadHostels();
+  }, []);
+
+  function toggleHostel(id: string) {
+    setSelectedHostelIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  }
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   async function submit(formData: FormData) {
     const obj = Object.fromEntries(formData);
     setMessage(null);
     try {
-      await sendJson("/api/admin/plans", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...obj, assignAllHostels: true, includesTv: obj.includesTv === "on" }) });
+      await sendJson("/api/admin/plans", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...obj, hostelIds: selectedHostelIds, includesTv: obj.includesTv === "on" }) });
       setMessage({ type: "success", text: "Plan added." });
       await reload();
     } catch (err) {
@@ -234,7 +257,11 @@ function Plans({ rows, reload }: { rows: any[]; reload: () => void }) {
       await sendJson(`/api/admin/plans/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...obj, includesTv: obj.includesTv === "on" })
+        body: JSON.stringify({
+          ...obj,
+          hostelIds: selectedHostelIds,
+          includesTv: obj.includesTv === "on"
+        })
       });
       setMessage({ type: "success", text: "Plan updated." });
       await reload();
@@ -242,6 +269,18 @@ function Plans({ rows, reload }: { rows: any[]; reload: () => void }) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to update plan." });
     }
   }
+    const obj = Object.fromEntries(formData);
+    setMessage(null);
+    try {
+      await sendJson(`/api/admin/plans/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...obj, includesTv: obj.includesTv === "on" })
+      });
+      setMessage({ type: "success", text: "Plan updated." });
+      await reload();
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to update plan." });
   return (
     <>
       {message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}

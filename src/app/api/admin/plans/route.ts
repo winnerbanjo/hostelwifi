@@ -52,9 +52,12 @@ export async function POST(request: Request) {
       status: data.status || "active"
     }
   });
-  if (data.assignAllHostels) {
-    const hostels = await db.hostel.findMany();
-    await db.hostelPlan.createMany({ data: hostels.map((hostel: any) => ({ hostelId: hostel.id, planId: plan.id })), skipDuplicates: true });
+  if (data.hostelIds && Array.isArray(data.hostelIds) && data.hostelIds.length) {
+    await db.hostelPlan.createMany({
+        data: data.hostelIds.map((hostelId: string) => ({ hostelId, planId: plan.id })),
+        skipDuplicates: true
+      });
+    
   }
   await db.auditLog.create({ data: { adminUserId: admin.id, action: "create", entityType: "Plan", entityId: plan.id } });
   return NextResponse.json({ plan });
