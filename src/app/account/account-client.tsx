@@ -11,7 +11,7 @@ async function requestJson(path: string, options?: RequestInit) {
 }
 
 export function AccountClient() {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [customer, setCustomer] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -48,6 +48,26 @@ export function AccountClient() {
     setMessage(null);
     try {
       const body = Object.fromEntries(formData);
+
+      if (mode === "forgot") {
+        if (body.password !== body.confirmPassword) {
+          setMessage({ type: "error", text: "Passwords do not match." });
+          return;
+        }
+        await requestJson("/api/customer/forgot-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: body.email,
+            phone: body.phone,
+            newPassword: body.password
+          })
+        });
+        setMessage({ type: "success", text: "Password reset successfully. You can now login." });
+        setMode("login");
+        return;
+      }
+
       await requestJson(`/api/customer/${mode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -104,15 +124,35 @@ export function AccountClient() {
       <div className="grid gap-5 lg:grid-cols-[1fr_0.8fr]">
         <form action={auth} className="card grid gap-3 p-5">
           {message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}
-          <div className="flex gap-2">
-            <button type="button" className={`btn px-4 py-2 ${mode === "login" ? "btn-primary" : "btn-ghost"}`} onClick={() => setMode("login")}>Login</button>
-            <button type="button" className={`btn px-4 py-2 ${mode === "signup" ? "btn-primary" : "btn-ghost"}`} onClick={() => setMode("signup")}>Create account</button>
-          </div>
+          
+          {mode === "forgot" ? (
+            <p className="font-black text-ink text-lg">Reset Password</p>
+          ) : (
+            <div className="flex gap-2">
+              <button type="button" className={`btn px-4 py-2 ${mode === "login" ? "btn-primary" : "btn-ghost"}`} onClick={() => setMode("login")}>Login</button>
+              <button type="button" className={`btn px-4 py-2 ${mode === "signup" ? "btn-primary" : "btn-ghost"}`} onClick={() => setMode("signup")}>Create account</button>
+            </div>
+          )}
+
           {mode === "signup" ? <input className="field" name="fullName" placeholder="Full name" required /> : null}
-          {mode === "signup" ? <input className="field" name="phone" placeholder="Phone number" required /> : null}
+          {mode === "signup" || mode === "forgot" ? <input className="field" name="phone" placeholder="Phone number" required /> : null}
           <input className="field" name="email" type="email" placeholder="Email address" required />
-          <input className="field" name="password" type="password" placeholder="Password" required />
-          <button className="btn btn-primary">{mode === "signup" ? "Create account" : "Login"}</button>
+          <input className="field" name="password" type="password" placeholder={mode === "forgot" ? "New password" : "Password"} required />
+          {mode === "forgot" ? <input className="field" name="confirmPassword" type="password" placeholder="Confirm new password" required /> : null}
+          
+          <button className="btn btn-primary">
+            {mode === "signup" ? "Create account" : mode === "forgot" ? "Reset password" : "Login"}
+          </button>
+
+          {mode === "login" ? (
+            <button type="button" className="text-left text-xs font-bold text-brand hover:underline mt-1" onClick={() => setMode("forgot")}>
+              Forgot password?
+            </button>
+          ) : mode === "forgot" ? (
+            <button type="button" className="text-left text-xs font-bold text-brand hover:underline mt-1" onClick={() => setMode("login")}>
+              Back to Login
+            </button>
+          ) : null}
         </form>
         <div className="card p-5">
           <p className="text-sm font-bold uppercase tracking-wide text-brand">Bank transfer</p>

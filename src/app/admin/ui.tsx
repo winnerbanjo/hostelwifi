@@ -96,7 +96,7 @@ export function AdminDashboard({ adminName }: { adminName: string }) {
           {tab === "Overview" ? <Overview metrics={data.dashboard?.metrics} /> : null}
           {tab === "Orders" ? <Orders rows={data.orders?.orders || []} reload={load} /> : null}
           {tab === "Vouchers" ? <Vouchers rows={data.vouchers?.vouchers || []} reload={load} /> : null}
-          {tab === "Hostels" ? <Hostels rows={data.hostels?.hostels || []} reload={load} /> : null}
+          {tab === "Hostels" ? <Hostels rows={data.hostels?.hostels || []} plans={data.plans?.plans || []} reload={load} /> : null}
           {tab === "Plans" ? <Plans rows={data.plans?.plans || []} reload={load} /> : null}
           {tab === "Wallet" ? <WalletTopups rows={data.walletTopups?.topups || []} reload={load} /> : null}
           {tab === "Settings" ? <Settings bank={data.settings?.bank} reload={load} /> : null}
@@ -165,7 +165,7 @@ function Vouchers({ rows, reload }: { rows: any[]; reload: () => void }) {
   return <Table headers={["Code", "Customer", "Hostel", "Plan", "Status", "Expiry", "Actions"]}>{rows.map((v) => <tr key={v.id}><td className="font-bold">{v.code}</td><td>{v.customer.fullName}</td><td>{v.hostel.name}</td><td>{v.plan.name}</td><td>{v.status}</td><td>{v.expiresAt ? new Date(v.expiresAt).toLocaleDateString() : "-"}</td><td><button className="btn btn-ghost px-3 py-2 text-xs" onClick={() => revoke(v.id)}>Revoke</button></td></tr>)}</Table>;
 }
 
-function Hostels({ rows, reload }: { rows: any[]; reload: () => void }) {
+function Hostels({ rows, plans, reload }: { rows: any[]; plans: any[]; reload: () => void }) {
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   async function submit(formData: FormData) {
     setMessage(null);
@@ -180,10 +180,14 @@ function Hostels({ rows, reload }: { rows: any[]; reload: () => void }) {
   async function save(id: string, formData: FormData) {
     setMessage(null);
     try {
+      const planIds = formData.getAll("planIds") as string[];
       await sendJson(`/api/admin/hostels/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.fromEntries(formData))
+        body: JSON.stringify({
+          ...Object.fromEntries(formData),
+          planIds
+        })
       });
       setMessage({ type: "success", text: "Hostel updated." });
       await reload();
@@ -206,6 +210,25 @@ function Hostels({ rows, reload }: { rows: any[]; reload: () => void }) {
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
+            <div className="md:col-span-5 border-t border-line pt-3 mt-1">
+              <p className="text-sm font-bold text-slate-700 mb-2">Available Plans:</p>
+              <div className="flex flex-wrap gap-x-6 gap-y-2">
+                {plans.map((plan) => {
+                  const isChecked = h.planIds?.includes(plan.id);
+                  return (
+                    <label key={plan.id} className="flex items-center gap-2 text-sm font-semibold text-slate-600 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        name="planIds" 
+                        value={plan.id} 
+                        defaultChecked={isChecked} 
+                      />
+                      {plan.name} ({money(plan.price)})
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
             <button className="btn btn-primary md:col-span-5">Save hostel</button>
           </form>
         ))}

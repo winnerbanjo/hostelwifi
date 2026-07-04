@@ -16,6 +16,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       status: data.status
     }
   });
+
+  if (Array.isArray(data.planIds)) {
+    const existingHostelPlans = await db.hostelPlan.findMany({ where: { hostelId: id } });
+
+    for (const hp of existingHostelPlans) {
+      await db.hostelPlan.update({
+        where: { hostelId_planId: { hostelId: id, planId: hp.planId } },
+        data: { status: "inactive" }
+      });
+    }
+
+    for (const planId of data.planIds) {
+      await db.hostelPlan.upsert({
+        where: { hostelId_planId: { hostelId: id, planId } },
+        update: { status: "active" },
+        create: { hostelId: id, planId, status: "active" }
+      });
+    }
+  }
+
   await db.auditLog.create({ data: { adminUserId: admin.id, action: "update", entityType: "Hostel", entityId: id } });
   return NextResponse.json({ hostel });
 }

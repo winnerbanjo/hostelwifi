@@ -10,8 +10,25 @@ function clean(value: unknown) {
 
 export async function GET() {
   await requireAdmin();
-  if (!hasDatabaseUrl) return NextResponse.json({ hostels: demoAdminData.hostels, demo: true });
-  return NextResponse.json({ hostels: await db.hostel.findMany({ orderBy: { name: "asc" } }) });
+  if (!hasDatabaseUrl) {
+    const hostels = demoAdminData.hostels.map(h => ({
+      ...h,
+      planIds: demoAdminData.plans.map(p => p.id)
+    }));
+    return NextResponse.json({ hostels, demo: true });
+  }
+
+  const hostels = await db.hostel.findMany({ orderBy: { name: "asc" } });
+  const hostelPlans = await db.hostelPlan.findMany({ where: { status: "active" } });
+
+  const hostelsWithPlans = hostels.map((hostel) => {
+    const activePlans = hostelPlans
+      .filter((hp) => hp.hostelId === hostel.id)
+      .map((hp) => hp.planId);
+    return { ...hostel, planIds: activePlans };
+  });
+
+  return NextResponse.json({ hostels: hostelsWithPlans });
 }
 
 export async function POST(request: Request) {
@@ -31,10 +48,10 @@ export async function POST(request: Request) {
       status: data.status || "active"
     }
   });
-  const plans = await db.plan.findMany({ where: { status: "active" }, select: { id: true } });
+  const plans = await db.plan.findMany({ where: { status: "active" } });
   if (plans.length) {
     await db.hostelPlan.createMany({
-      data: plans.map((plan: any) => ({ hostelId: hostel.id, planId: plan.id })),
+      data: plans.map((plan: any) => ({ hostelId: hostel.id, planId: plan.id, status: "active" })),
       skipDuplicates: true
     });
   }
