@@ -261,7 +261,6 @@ function Plans({ rows, reload }: { rows: any[]; reload: () => void }) {
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
   }
-  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   async function submit(formData: FormData) {
     const obj = Object.fromEntries(formData);
     setMessage(null);
@@ -292,18 +291,6 @@ function Plans({ rows, reload }: { rows: any[]; reload: () => void }) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to update plan." });
     }
   }
-    const obj = Object.fromEntries(formData);
-    setMessage(null);
-    try {
-      await sendJson(`/api/admin/plans/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...obj, includesTv: obj.includesTv === "on" })
-      });
-      setMessage({ type: "success", text: "Plan updated." });
-      await reload();
-    } catch (err) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to update plan." });
   return (
     <>
       {message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}
