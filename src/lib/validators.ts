@@ -38,7 +38,8 @@ export const customerSignupSchema = z.object({
   fullName: z.string().min(2),
   phone: z.string().min(8),
   email: z.string().email(),
-  password: z.string().min(6)
+  password: z.string().min(6),
+  hostelId: z.string().min(1)
 });
 
 export const customerLoginSchema = z.object({

@@ -101,9 +101,9 @@ export function AdminDashboard({ adminName }: { adminName: string }) {
           {tab === "Wallet" ? <WalletTopups rows={data.walletTopups?.topups || []} reload={load} /> : null}
           {tab === "Settings" ? <Settings bank={data.settings?.bank} reload={load} /> : null}
           {tab === "Support" ? <Support rows={data.tickets?.tickets || []} reload={load} /> : null}
-          {tab === "Reports" ? <Reports data={data} /> : null}
+          {tab === "Reports" ? <Reports data={data} reload={load} /> : null}
           {tab === "Policies" ? <Policies rows={data.policies?.policies || []} reload={load} /> : null}
-          {tab === "Customers" ? <Customers rows={data.customers?.customers || []} /> : null}
+          {tab === "Customers" ? <Customers rows={data.customers?.customers || []} hostels={data.hostels?.hostels || []} reload={load} /> : null}
         </section>
       </div>
     </main>
@@ -449,10 +449,92 @@ function PasswordSettings() {
   );
 }
 
+function SupportContactsSettings() {
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [contacts, setContacts] = useState<any[]>([]);
+
+  async function loadContacts() {
+    try {
+      const res = await getJson("/api/admin/settings/support-contacts");
+      setContacts(res.supportContacts || []);
+    } catch (err) {
+      console.error("Failed to load support contacts", err);
+    }
+  }
+
+  useEffect(() => {
+    loadContacts();
+  }, []);
+
+  async function addContact(formData: FormData) {
+    setMessage(null);
+    const name = String(formData.get("name")).trim();
+    const phone = String(formData.get("phone")).trim();
+
+    if (!name || !phone) return;
+
+    const updated = [...contacts, { id: Date.now().toString(), name, phone }];
+    try {
+      await sendJson("/api/admin/settings/support-contacts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ supportContacts: updated })
+      });
+      setMessage({ type: "success", text: "Contact added successfully." });
+      setContacts(updated);
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to add support contact." });
+    }
+  }
+
+  async function deleteContact(id: string) {
+    setMessage(null);
+    const updated = contacts.filter((c) => c.id !== id);
+    try {
+      await sendJson("/api/admin/settings/support-contacts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ supportContacts: updated })
+      });
+      setMessage({ type: "success", text: "Contact deleted successfully." });
+      setContacts(updated);
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to delete support contact." });
+    }
+  }
+
+  return (
+    <div className="card grid gap-3 p-4">
+      <p className="font-black text-ink">WhatsApp Support Contacts</p>
+      {message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}
+      
+      <form action={addContact} className="grid gap-3 sm:grid-cols-3 bg-slate-50 p-3 rounded border border-line">
+        <input className="field py-1" name="name" placeholder="Contact Name" required />
+        <input className="field py-1" name="phone" placeholder="WhatsApp Phone" required />
+        <button className="btn btn-primary text-xs py-2">Add Contact</button>
+      </form>
+
+      <div className="mt-3 grid gap-2">
+        {contacts.map((c) => (
+          <div key={c.id} className="flex justify-between items-center bg-slate-100 p-2.5 rounded text-sm font-semibold text-slate-700">
+            <div>
+              <p>{c.name}</p>
+              <p className="text-xs text-slate-500 font-normal">WhatsApp: {c.phone}</p>
+            </div>
+            <button type="button" className="btn btn-ghost px-2 py-1 text-xs text-red-600 hover:bg-red-50" onClick={() => deleteContact(c.id)}>Delete</button>
+          </div>
+        ))}
+        {!contacts.length ? <p className="text-xs text-slate-400">No support contacts configured. System defaults will be used.</p> : null}
+      </div>
+    </div>
+  );
+}
+
 function Settings({ bank, reload }: { bank?: any; reload: () => void }) {
   return (
     <div className="grid gap-5">
       <BankSettings bank={bank} reload={reload} />
+      <SupportContactsSettings />
       <PasswordSettings />
     </div>
   );
@@ -466,10 +548,43 @@ function Support({ rows, reload }: { rows: any[]; reload: () => void }) {
   return <Table headers={["Customer", "Hostel", "Issue", "Message", "Status", "Actions"]}>{rows.map((t) => <tr key={t.id}><td>{t.fullName}<br /><span>{t.phone}</span></td><td>{t.hostel?.name || "-"}</td><td>{t.issueType}</td><td>{t.message}</td><td>{t.status}</td><td><button className="btn btn-ghost mr-2 px-3 py-2 text-xs" onClick={() => update(t.id, "in_progress")}>In progress</button><button className="btn btn-primary px-3 py-2 text-xs" onClick={() => update(t.id, "resolved")}>Resolve</button><a className="ml-2 text-xs font-bold text-brand" href={whatsappLink(`Hello ${t.fullName}, support from Jendor The Plug.`)}>WhatsApp</a></td></tr>)}</Table>;
 }
 
-function Reports({ data }: { data: any }) {
+function Reports({ data, reload }: { data: any; reload: () => void }) {
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const sales = data.sales?.orders || [];
   const csv = useMemo(() => ["reference,customer,hostel,plan,amount,status", ...sales.map((o: any) => `${o.reference},${o.fullName},${o.hostel.name},${o.plan.name},${o.amount},${o.paymentStatus}`)].join("\n"), [sales]);
-  return <div className="grid gap-5"><a className="btn btn-secondary w-fit" href={`data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`} download="jendor-sales.csv"><Download size={16} /> Export sales CSV</a><Table headers={["Report", "Value"]}><tr><td>Daily sales rows</td><td>{sales.length}</td></tr><tr><td>Sales by hostel</td><td>{data.hostelReports?.rows?.length || 0}</td></tr><tr><td>Sales by plan</td><td>{data.planReports?.rows?.length || 0}</td></tr><tr><td>Voucher status groups</td><td>{data.voucherReports?.rows?.length || 0}</td></tr><tr><td>Failed payments</td><td>{data.failed?.orders?.length || 0}</td></tr></Table></div>;
+
+  async function handleClearReports() {
+    if (!window.confirm("ARE YOU ABSOLUTELY SURE? This will permanently delete all orders, vouchers, payments logs, and support complaints. This action can only be done once every 30 days and CANNOT be undone!")) {
+      return;
+    }
+    setMessage(null);
+    try {
+      await sendJson("/api/admin/reports/clear", { method: "POST" });
+      setMessage({ type: "success", text: "All reporting data cleared successfully." });
+      reload();
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to clear reports." });
+    }
+  }
+
+  return (
+    <div className="grid gap-5">
+      {message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}
+      <div className="flex gap-3">
+        <a className="btn btn-secondary w-fit" href={`data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`} download="jendor-sales.csv"><Download size={16} /> Export sales CSV</a>
+        <button className="btn btn-ghost border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 w-fit text-sm font-bold" onClick={handleClearReports}>
+          Clear Reports (Once in 30 Days)
+        </button>
+      </div>
+      <Table headers={["Report", "Value"]}>
+        <tr><td>Daily sales rows</td><td>{sales.length}</td></tr>
+        <tr><td>Sales by hostel</td><td>{data.hostelReports?.rows?.length || 0}</td></tr>
+        <tr><td>Sales by plan</td><td>{data.planReports?.rows?.length || 0}</td></tr>
+        <tr><td>Voucher status groups</td><td>{data.voucherReports?.rows?.length || 0}</td></tr>
+        <tr><td>Failed payments</td><td>{data.failed?.orders?.length || 0}</td></tr>
+      </Table>
+    </div>
+  );
 }
 
 function Policies({ rows, reload }: { rows: any[]; reload: () => void }) {
@@ -480,8 +595,196 @@ function Policies({ rows, reload }: { rows: any[]; reload: () => void }) {
   return <div className="grid gap-4">{rows.map((p) => <form key={p.id} action={save.bind(null, p.slug)} className="card grid gap-3 p-4"><input className="field font-bold" name="title" defaultValue={p.title} /><textarea className="field min-h-32" name="content" defaultValue={p.content} /><button className="btn btn-primary w-fit">Save policy</button></form>)}</div>;
 }
 
-function Customers({ rows }: { rows: any[] }) {
-  return <Table headers={["Name", "Phone", "Email", "Wallet", "Orders", "Joined"]}>{rows.map((c) => <tr key={c.id}><td>{c.fullName}</td><td>{c.phone}</td><td>{c.email}</td><td>{money(c.walletBalance || 0)}</td><td>{c.orders.length}</td><td>{new Date(c.createdAt).toLocaleDateString()}</td></tr>)}</Table>;
+function Customers({ rows, hostels, reload }: { rows: any[]; hostels: any[]; reload: () => void }) {
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+
+  // Edit form state
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editWallet, setEditWallet] = useState(0);
+  const [editHostel, setEditHostel] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+
+  function startEdit(c: any) {
+    setEditId(c.id);
+    setEditName(c.fullName);
+    setEditPhone(c.phone);
+    setEditEmail(c.email);
+    setEditWallet(c.walletBalance || 0);
+    setEditHostel(c.hostelId || "");
+    setEditPassword("");
+  }
+
+  async function handleCreate(formData: FormData) {
+    setMessage(null);
+    try {
+      const obj = Object.fromEntries(formData);
+      await sendJson("/api/admin/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...obj,
+          walletBalance: Number(obj.walletBalance || 0)
+        })
+      });
+      setMessage({ type: "success", text: "Customer created." });
+      reload();
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to create customer." });
+    }
+  }
+
+  async function handleUpdate(id: string, force = false) {
+    setMessage(null);
+    try {
+      await sendJson(`/api/admin/customers/${id}${force ? "?force=true" : ""}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: editName,
+          phone: editPhone,
+          email: editEmail,
+          walletBalance: editWallet,
+          hostelId: editHostel,
+          password: editPassword
+        })
+      });
+      setMessage({ type: "success", text: "Customer updated." });
+      setEditId(null);
+      reload();
+    } catch (err: any) {
+      const msg = err.message || "";
+      if (msg.includes("recently") || msg.includes("30 days")) {
+        if (window.confirm(`${msg}\n\nDo you want to FORCE update this customer's hostel?`)) {
+          await handleUpdate(id, true);
+          return;
+        }
+      } else {
+        setMessage({ type: "error", text: msg || "Failed to update customer." });
+      }
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!window.confirm("Are you sure you want to delete this customer? This action cannot be undone.")) return;
+    setMessage(null);
+    try {
+      await sendJson(`/api/admin/customers/${id}`, { method: "DELETE" });
+      setMessage({ type: "success", text: "Customer deleted." });
+      reload();
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to delete customer." });
+    }
+  }
+
+  return (
+    <div className="grid gap-5">
+      {message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}
+      
+      {/* Create form */}
+      <form action={handleCreate} className="card grid gap-3 p-4 md:grid-cols-6 bg-white shadow-soft">
+        <p className="font-black text-ink md:col-span-6">Manually Create Customer</p>
+        <input className="field" name="fullName" placeholder="Full name" required />
+        <input className="field" name="phone" placeholder="Phone number" required />
+        <input className="field" name="email" type="email" placeholder="Email address" required />
+        <input className="field" name="password" type="password" placeholder="Password" required />
+        <select className="field" name="hostelId" required>
+          <option value="">Select Hostel</option>
+          {hostels.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+        </select>
+        <input className="field" name="walletBalance" type="number" min="0" placeholder="Wallet balance (₦)" defaultValue="0" />
+        <button className="btn btn-primary md:col-span-6">Create Customer</button>
+      </form>
+
+      <Table headers={["Name", "Hostel", "Wallet", "Phone", "Email", "Joined", "Actions"]}>
+        {rows.map((c) => {
+          const hostelName = hostels.find((h) => h.id === c.hostelId)?.name || "Not assigned";
+          const isEditing = editId === c.id;
+          const isExpanded = expandedId === c.id;
+
+          return (
+            <>
+              <tr key={c.id}>
+                {isEditing ? (
+                  <>
+                    <td><input className="field py-1" value={editName} onChange={(e) => setEditName(e.target.value)} /></td>
+                    <td>
+                      <select className="field py-1" value={editHostel} onChange={(e) => setEditHostel(e.target.value)}>
+                        <option value="">Select Hostel</option>
+                        {hostels.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+                      </select>
+                    </td>
+                    <td><input className="field py-1" type="number" value={editWallet} onChange={(e) => setEditWallet(Number(e.target.value))} /></td>
+                    <td><input className="field py-1" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} /></td>
+                    <td><input className="field py-1" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /></td>
+                    <td>
+                      <input className="field py-1" type="password" placeholder="New pass (opt)" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} />
+                    </td>
+                    <td className="min-w-40">
+                      <button type="button" className="btn btn-primary mr-2 px-2 py-1 text-xs" onClick={() => handleUpdate(c.id)}>Save</button>
+                      <button type="button" className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setEditId(null)}>Cancel</button>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="font-bold">{c.fullName}</td>
+                    <td>{hostelName}</td>
+                    <td>{money(c.walletBalance || 0)}</td>
+                    <td>{c.phone}</td>
+                    <td>{c.email}</td>
+                    <td>{new Date(c.createdAt).toLocaleDateString()}</td>
+                    <td className="min-w-64">
+                      <button type="button" className="btn btn-ghost mr-2 px-2 py-1 text-xs" onClick={() => startEdit(c)}>Edit</button>
+                      <button type="button" className="btn btn-ghost mr-2 px-2 py-1 text-xs" onClick={() => setExpandedId(isExpanded ? null : c.id)}>
+                        {isExpanded ? "Hide History" : "View History"}
+                      </button>
+                      <button type="button" className="btn btn-ghost px-2 py-1 text-xs text-red-600 hover:bg-red-50" onClick={() => handleDelete(c.id)}>Delete</button>
+                    </td>
+                  </>
+                )}
+              </tr>
+              {isExpanded ? (
+                <tr key={`${c.id}-expanded`}>
+                  <td colSpan={7} className="bg-slate-50 p-4">
+                    <p className="font-bold text-xs uppercase text-slate-500 mb-2">Wallet Transactions & Spending History</p>
+                    {c.walletTransactions?.length ? (
+                      <div className="overflow-x-auto max-h-60">
+                        <table className="w-full text-left text-xs bg-white border border-line rounded">
+                          <thead>
+                            <tr className="bg-slate-100 border-b border-line">
+                              <th className="p-2">Type</th>
+                              <th className="p-2">Amount</th>
+                              <th className="p-2">Status</th>
+                              <th className="p-2">Date</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {c.walletTransactions.map((tx: any) => (
+                              <tr key={tx.id} className="border-b border-line last:border-0">
+                                <td className="p-2 font-semibold">{tx.type}</td>
+                                <td className="p-2">{money(tx.amount)}</td>
+                                <td className="p-2">{tx.status}</td>
+                                <td className="p-2">{new Date(tx.createdAt).toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">No transaction records found for this customer.</p>
+                    )}
+                  </td>
+                </tr>
+              ) : null}
+            </>
+          );
+        })}
+      </Table>
+    </div>
+  );
 }
 
 function Table({ headers, children }: { headers: string[]; children: React.ReactNode }) {

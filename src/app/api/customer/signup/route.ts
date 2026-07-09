@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   const customer = existing
     ? await db.customer.update({
         where: { id: existing.id },
-        data: { fullName: data.fullName, phone: data.phone, passwordHash, status: "active" }
+        data: { fullName: data.fullName, phone: data.phone, passwordHash, hostelId: data.hostelId, status: "active" }
       })
     : await db.customer.create({
         data: {
@@ -31,8 +31,10 @@ export async function POST(request: Request) {
           phone: data.phone,
           email: data.email,
           passwordHash,
+          hostelId: data.hostelId,
           walletBalance: 0,
-          status: "active"
+          status: "active",
+          lastHostelChangedAt: new Date()
         }
       });
 

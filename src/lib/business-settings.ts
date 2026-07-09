@@ -29,3 +29,22 @@ export async function getBankDetails(): Promise<BankDetails> {
     accountName: settings.bankAccountName
   };
 }
+
+export type SupportContact = {
+  id: string;
+  name: string;
+  phone: string;
+};
+
+export const defaultSupportContacts: SupportContact[] = [
+  { id: "1", name: "WhatsApp Support 1", phone: business.phone },
+  { id: "2", name: "WhatsApp Support 2", phone: business.phoneAlt || business.whatsapp }
+];
+
+export async function getSupportContacts(): Promise<SupportContact[]> {
+  if (!hasDatabaseUrl) return defaultSupportContacts;
+  const settings = await db.businessSettings.findUnique({
+    where: { id: "default" }
+  });
+  return settings?.supportContacts || defaultSupportContacts;
+}

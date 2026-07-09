@@ -10,14 +10,14 @@ async function requestJson(path: string, options?: RequestInit) {
   return data;
 }
 
-export function AccountClient() {
+export function AccountClient({ hostelId }: { hostelId?: string }) {
   const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [customer, setCustomer] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [hostels, setHostels] = useState<any[]>([]);
   const [plans, setPlans] = useState<any[]>([]);
-  const [selectedHostel, setSelectedHostel] = useState("");
+  const [selectedHostel, setSelectedHostel] = useState(hostelId || "");
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
 
   async function loadAccount() {
@@ -26,7 +26,7 @@ export function AccountClient() {
     setOrders(account.orders || []);
     setTransactions(account.walletTransactions || []);
     setHostels(hostelData.hostels || []);
-    const firstHostel = selectedHostel || hostelData.hostels?.[0]?.id || "";
+    const firstHostel = hostelId || selectedHostel || hostelData.hostels?.[0]?.id || "";
     if (firstHostel) {
       setSelectedHostel(firstHostel);
       const planData = await requestJson(`/api/hostels/${firstHostel}/plans`);
@@ -68,15 +68,36 @@ export function AccountClient() {
         return;
       }
 
+      const payload = { ...body };
+      if (mode === "signup" && hostelId) {
+        payload.hostelId = hostelId;
+      }
+
       await requestJson(`/api/customer/${mode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
+        body: JSON.stringify(payload)
       });
       setMessage({ type: "success", text: mode === "signup" ? "Account created." : "Logged in." });
       await loadAccount();
     } catch (err) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to continue." });
+    }
+  }
+
+  async function changeHostel(formData: FormData) {
+    setMessage(null);
+    try {
+      const newHostelId = formData.get("newHostelId");
+      await requestJson("/api/customer/hostel", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostelId: newHostelId })
+      });
+      setMessage({ type: "success", text: "Hostel changed successfully." });
+      await loadAccount();
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Unable to change hostel." });
     }
   }
 
@@ -136,6 +157,12 @@ export function AccountClient() {
 
           {mode === "signup" ? <input className="field" name="fullName" placeholder="Full name" required /> : null}
           {mode === "signup" || mode === "forgot" ? <input className="field" name="phone" placeholder="Phone number" required /> : null}
+          {mode === "signup" && !hostelId ? (
+            <select className="field" name="hostelId" required defaultValue={selectedHostel}>
+              <option value="">Select your Hostel</option>
+              {hostels.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+            </select>
+          ) : null}
           <input className="field" name="email" type="email" placeholder="Email address" required />
           <input className="field" name="password" type="password" placeholder={mode === "forgot" ? "New password" : "Password"} required />
           {mode === "forgot" ? <input className="field" name="confirmPassword" type="password" placeholder="Confirm new password" required /> : null}
@@ -174,7 +201,23 @@ export function AccountClient() {
           <p className="text-sm font-semibold text-slate-500">Wallet balance</p>
           <p className="mt-2 text-3xl font-black text-ink">{money(customer.walletBalance || 0)}</p>
           <p className="mt-1 text-sm text-slate-500">{customer.fullName}</p>
-          <button className="btn btn-ghost mt-4 px-4 py-2 text-sm" onClick={logout}>Logout</button>
+          
+          <div className="mt-3 border-t border-line pt-3">
+            <p className="text-xs font-bold text-slate-400 uppercase">My Hostel</p>
+            <p className="font-semibold text-slate-700 mt-1">
+              {hostels.find((h) => h.id === customer.hostelId)?.name || "Not assigned"}
+            </p>
+            
+            <form action={changeHostel} className="mt-2 grid gap-2">
+              <select className="field text-xs py-1" name="newHostelId" required defaultValue={customer.hostelId || ""}>
+                <option value="">Change Hostel...</option>
+                {hostels.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+              </select>
+              <button className="btn btn-ghost text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200">Change Hostel</button>
+            </form>
+          </div>
+
+          <button className="btn btn-ghost mt-4 px-4 py-2 text-sm w-full" onClick={logout}>Logout</button>
         </div>
         <form action={topup} className="card grid gap-3 p-5 lg:col-span-2">
           <p className="font-black text-ink">Add money to wallet</p>
@@ -190,9 +233,15 @@ export function AccountClient() {
 
       <form action={buy} className="card grid gap-3 p-5 md:grid-cols-2">
         <p className="font-black text-ink md:col-span-2">Buy plan with wallet</p>
-        <select className="field" value={selectedHostel} onChange={(event) => loadPlans(event.target.value)} required>
-          {hostels.map((hostel) => <option key={hostel.id} value={hostel.id}>{hostel.name}</option>)}
-        </select>
+        {hostelId ? (
+          <div className="field flex items-center bg-slate-100 font-semibold px-3 py-2 text-slate-600 md:col-span-2">
+            Hostel: {hostels.find((h) => h.id === selectedHostel)?.name || hostelId}
+          </div>
+        ) : (
+          <select className="field" value={selectedHostel} onChange={(event) => loadPlans(event.target.value)} required>
+            {hostels.map((hostel) => <option key={hostel.id} value={hostel.id}>{hostel.name}</option>)}
+          </select>
+        )}
         <select className="field" name="planId" required>
           {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} - {money(plan.price)}</option>)}
         </select>
